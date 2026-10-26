@@ -1,0 +1,23 @@
+/* Ajudaescolar · base común
+   Fuentes alojadas en la propia web (sin depender de otros dominios, que el modo infantil del iPad puede bloquear).
+   Licencia de las fuentes: SIL Open Font License (ver assets/fonts/OFL-*.txt). */
+
+@font-face{font-family:"Andika";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/Andika-Regular.woff2") format("woff2")}
+@font-face{font-family:"Andika";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/Andika-Bold.woff2") format("woff2")}
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/AtkinsonHyperlegible-Regular.woff2") format("woff2")}
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/AtkinsonHyperlegible-Bold.woff2") format("woff2")}
+
+html{
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+  overscroll-behavior:none;          /* sin "rebote" de la página al llegar al final */
+  -webkit-tap-highlight-color:transparent;
+}
+body{margin:0}
+
+/* Enlace de vuelta al inicio: en modo "pantalla de inicio" no hay botón Atrás del navegador */
+.volver{
+  display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:999px;
+  text-decoration:none;color:inherit;border:1.5px solid currentColor;opacity:.75;font-size:15px;align-self:flex-start;
+}
+.volver:focus-visible{outline:3px solid currentColor;outline-offset:2px}

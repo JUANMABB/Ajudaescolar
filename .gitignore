@@ -1,0 +1,7 @@
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+# Nunca subir datos personales ni copias de seguridad del iPad
+*.backup.json
+datos-personales/
