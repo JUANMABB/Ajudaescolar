@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#eef2f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Balances misterioses</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="stylesheet" href="../assets/base.css">
+<link rel="stylesheet" href="../assets/taller.css">
+<style>
+/* Una balança (o dues) al centre. Sota cada plat, els pesos que es poden posar.
+   Tocar una peça d'un plat la treu. La resposta es diu amb el selector de nombre. */
+.scales{display:grid;gap:10px}
+.scales.two{grid-template-columns:1fr 1fr}
+@media (max-width:760px){.scales.two{grid-template-columns:1fr}}
+.scaleBox{display:flex;flex-direction:column;gap:6px;min-width:0}
+.scaleBox svg{width:100%;height:auto;display:block;touch-action:manipulation}
+.scales:not(.two) .scaleBox{max-width:640px;width:100%;margin:0 auto}
+.palettes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.palette{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;padding:8px;border-radius:14px;background:var(--paper);border:2px dashed var(--rule-soft)}
+.palette .lbl{width:100%;text-align:center;font-size:14px;color:var(--muted)}
+.wbtn{width:56px;height:56px;border-radius:50%;border:2px solid var(--warm);background:var(--warm-soft);font-family:var(--font-display);font-size:22px;font-weight:700}
+.state{text-align:center;font-size:16px;color:var(--muted);min-height:1.4em}
+.answers{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}
+.answer{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+.answer svg{width:46px;height:46px}
+.item{cursor:pointer}
+.item.fixed{cursor:default}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="volver" href="./">← Taller</a>
+    <h1>Balances misterioses</h1>
+  </div>
+
+  <!-- Triar nivell -->
+  <section id="levelsView" class="wrap" style="gap:14px">
+    <p class="muted">Una balança queda recta quan els dos plats pesen el mateix. Fes-la servir per descobrir quant pesen les caixes misterioses. Tria per on vols començar.</p>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <!-- Jugar -->
+  <section id="playView" class="wrap" style="gap:14px" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="levelName"></h2>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="stage">
+      <p class="ask" id="ask"></p>
+      <div class="scales" id="scales"></div>
+      <div class="answers" id="answers"></div>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+      <div class="row">
+        <button class="btn primary" id="btnCheck" type="button">Comprova</button>
+        <button class="btn primary" id="btnNext" type="button" hidden>Següent repte →</button>
+        <button class="btn soft" id="btnHint" type="button">Una pista</button>
+        <button class="btn" id="btnReset" type="button">Torna a començar</button>
+        <button class="btn" id="btnLevels" type="button">Tria nivell</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="../assets/taller.js"></script>
+<script>
+(function(){
+  var GAME = "balances";
+  var $ = function(id){ return document.getElementById(id); };
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  // w(n) = pes amb un nombre; a / b = caixes misterioses
+  function W(n){ return { t:"w", v:n }; }
+  var A = { t:"b", k:"a" }, B = { t:"b", k:"b" };
+
+  // Cada repte: scales (una o dues balances: [esquerra, dreta]), vals (pes de les caixes),
+  // palette (pesos que es poden afegir), fixed (les peces del principi no es poden treure),
+  // ask (quines caixes s'han d'endevinar), goal "balance" (deixar-la recta) o "open" (repte obert).
+  var LEVELS = [
+    { name:"Equilibra", desc:"Posa pesos fins que la balança quedi recta.", ch:[
+      { text:"Fes que la balança quedi recta.", scales:[[[W(5)],[]]], palette:[1,2,3], fixed:true, goal:"balance",
+        hints:["Posa pesos al plat buit.","Han de sumar 5."] },
+      { text:"Fes que la balança quedi recta.", scales:[[[W(3),W(4)],[]]], palette:[1,2,5], fixed:true, goal:"balance",
+        hints:["Quant pesen el 3 i el 4 junts?","Has d'arribar a 7."] },
+      { text:"Ara ja hi ha un pes a cada costat. Fes-la recta.", scales:[[[W(10)],[W(2)]]], palette:[1,2,3,5], fixed:true, goal:"balance",
+        hints:["Quant falta perquè la dreta pesi com l'esquerra?","10 − 2 = ?"] },
+      { text:"Aquí no pots treure el 9. Com la deixes recta?", scales:[[[W(6)],[W(9)]]], palette:[1,2,3], fixed:true, goal:"balance",
+        hints:["També pots posar pesos al costat de l'esquerra.","Quant li falta al 6 per arribar a 9?"] },
+      { text:"Repte lliure: posa pesos diferents a cada plat, però que la balança quedi recta.", scales:[[[],[]]], palette:[1,2,3,5], goal:"open",
+        hints:["Per exemple, un 5 a un costat… i a l'altre?","5 = 2 + 3. Se t'acut alguna altra?"] }
+    ]},
+    { name:"La caixa misteriosa", desc:"Una caixa amb un pes secret. Descobreix quant pesa.", ch:[
+      { text:"Quant pesa la caixa? Fes servir els pesos per descobrir-ho.", scales:[[[A],[]]], vals:{a:4}, palette:[1,2,3,5], ask:["a"],
+        hints:["Posa pesos a l'altre plat fins que quedi recta.","Quan està recta, la caixa pesa el mateix que els pesos de l'altre costat."] },
+      { text:"Quant pesa la caixa?", scales:[[[A,W(2)],[]]], vals:{a:5}, palette:[1,2,5], ask:["a"],
+        hints:["Primer deixa la balança recta.","Al costat de la caixa també hi ha un 2. Què passa si el treus… i treus 2 de l'altre costat?"] },
+      { text:"La balança ja està recta. Quant pesa la caixa?", scales:[[[A,W(3)],[W(8)]]], vals:{a:5}, palette:[1,2,3], ask:["a"],
+        hints:["La caixa i el 3 pesen igual que el 8.","Què has de sumar a 3 per arribar a 8?"] },
+      { text:"Quant pesa la caixa?", scales:[[[A,W(4)],[W(3),W(7)]]], vals:{a:6}, palette:[1,2,3], ask:["a"],
+        hints:["Quant pesa tot el plat de la dreta?","La caixa i el 4 pesen 10."] }
+    ]},
+    { name:"Caixes iguals", desc:"Diverses caixes que pesen el mateix.", ch:[
+      { text:"Les dues caixes pesen igual. Quant pesa cada una?", scales:[[[A,A],[W(8)]]], vals:{a:4}, palette:[1,2,3], ask:["a"],
+        hints:["Dues caixes pesen 8 entre totes dues.","Quin nombre, sumat dues vegades, fa 8?"] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,W(1)],[W(7)]]], vals:{a:3}, palette:[1,2,3], ask:["a"],
+        hints:["Treu el 1 de l'esquerra… i també 1 de la dreta. Segueix recta?","Ara dues caixes pesen 6."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,A],[W(9),W(3)]]], vals:{a:4}, palette:[1,2,3], ask:["a"],
+        hints:["Quant pesa el plat de la dreta?","Tres caixes iguals pesen 12."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,A,W(2)],[W(5),W(9)]]], vals:{a:4}, palette:[1,2,3], ask:["a"],
+        hints:["Quant pesa la dreta? I si treus el 2 de l'esquerra, quant n'has de treure de la dreta?","Tres caixes pesen 12."] }
+    ]},
+    { name:"Caixes als dos plats", desc:"Hi ha caixes a tots dos costats. Molt de compte!", ch:[
+      { text:"Quant pesa cada caixa?", scales:[[[A,A],[A,W(5)]]], vals:{a:5}, palette:[], ask:["a"],
+        hints:["Hi ha una caixa a cada plat. Què passa si en treus una de cada costat?","Si treus una caixa de cada plat, queda recta: una caixa contra el 5."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,W(2)],[A,W(6)]]], vals:{a:4}, palette:[], ask:["a"],
+        hints:["Treu una caixa de cada plat.","Ara una caixa i un 2 pesen 6."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,A,W(1)],[A,W(7)]]], vals:{a:3}, palette:[], ask:["a"],
+        hints:["Treu una caixa de cada plat. I després el 1 de l'esquerra… i 1 de la dreta?","Dues caixes pesen 6."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,A,A],[A,W(8)]]], vals:{a:4}, palette:[], ask:["a"],
+        hints:["Treu una caixa de cada plat.","Dues caixes pesen 8."] }
+    ]},
+    { name:"Dues caixes diferents", desc:"Dues balances i dos misteris alhora.", ch:[
+      { text:"Hi ha caixes blaves i caixes taronja. Quant pesa cada una?", scales:[[[A,A],[B]],[[B],[W(6)]]], vals:{a:3,b:6}, palette:[], ask:["a","b"],
+        hints:["Comença per la balança de la dreta: només hi ha una caixa.","Si la taronja pesa 6, dues blaves també pesen 6."] },
+      { text:"Quant pesa cada caixa?", scales:[[[A,B],[W(7)]],[[B],[A,W(1)]]], vals:{a:3,b:4}, palette:[], ask:["a","b"],
+        hints:["La segona balança diu que la taronja pesa una blava i 1 més.","Llavors, a la primera: blava + blava + 1 = 7."] },
+      { text:"Quant pesa cada caixa?", scales:[[[B],[A,A,A]],[[A,B],[W(8)]]], vals:{a:2,b:6}, palette:[], ask:["a","b"],
+        hints:["La taronja pesa com tres blaves.","Llavors, a la segona balança hi ha l'equivalent de quatre blaves contra el 8."] },
+      { text:"L'últim repte. Quant pesa cada caixa?", scales:[[[A,A],[B,W(2)]],[[B],[A,W(1)]]], vals:{a:3,b:4}, palette:[], ask:["a","b"],
+        hints:["A la segona: la taronja pesa una blava i 1 més.","Canvia la taronja de la primera balança per «una blava i 1»: blava + blava = blava + 1 + 2."] }
+    ]}
+  ];
+
+  var li = 0, ci = 0, ch, state, hintN, solved, answerSteppers = {}, scaleViews = [];
+
+  function cid(l, c){ return "L" + l + "-" + c; }
+  function weight(it, vals){ return it.t === "w" ? it.v : vals[it.k]; }
+  function sum(arr, vals){ return arr.reduce(function(s, it){ return s + weight(it, vals); }, 0); }
+  function clone(scales){ return scales.map(function(s){ return [s[0].map(function(it){ return Object.assign({ orig:true }, it); }), s[1].map(function(it){ return Object.assign({ orig:true }, it); })]; }); }
+
+  // ---------- llista de nivells ----------
+  function showLevels(){
+    $("playView").hidden = true; $("levelsView").hidden = false;
+    var box = $("levels"); box.innerHTML = "";
+    LEVELS.forEach(function(L, i){
+      var ids = L.ch.map(function(_, c){ return cid(i, c); });
+      var n = Taller.countDone(GAME, ids);
+      var b = document.createElement("button"); b.type = "button"; b.className = "level";
+      b.innerHTML = '<span class="n">Nivell ' + (i + 1) + '</span><span class="t"></span><span class="d"></span><span class="done"></span>';
+      b.querySelector(".t").textContent = L.name;
+      b.querySelector(".d").textContent = L.desc;
+      b.querySelector(".done").textContent = n === ids.length ? "Fet!" : (n ? n + " de " + ids.length + " reptes" : L.ch.length + " reptes");
+      b.addEventListener("click", function(){
+        li = i; ci = 0;
+        for (var c = 0; c < L.ch.length; c++){ if (!Taller.done(GAME, cid(i, c))) { ci = c; break; } }
+        start();
+      });
+      box.appendChild(b);
+    });
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- un repte ----------
+  function start(){
+    $("levelsView").hidden = true; $("playView").hidden = false;
+    var L = LEVELS[li]; ch = L.ch[ci];
+    $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name;
+    Taller.dots($("dots"), L.ch.length, ci, function(i){ return Taller.done(GAME, cid(li, i)); });
+    $("ask").textContent = ch.text;
+    state = clone(ch.scales); hintN = 0; solved = false;
+    Taller.msg($("msg"), "");
+    $("btnNext").hidden = true; $("btnHint").disabled = false; $("btnReset").disabled = false;
+    $("btnCheck").hidden = !ch.ask;
+    buildScales(); buildAnswers();
+    window.scrollTo(0, 0);
+  }
+
+  function buildAnswers(){
+    var box = $("answers"); box.innerHTML = ""; answerSteppers = {};
+    (ch.ask || []).forEach(function(k){
+      var d = document.createElement("div"); d.className = "answer";
+      d.appendChild(boxIcon(k));
+      var t = document.createElement("span"); t.textContent = "pesa"; d.appendChild(t);
+      var s = document.createElement("div"); d.appendChild(s);
+      answerSteppers[k] = Taller.stepper(s, { min:0, max:20, value:0 });
+      box.appendChild(d);
+    });
+  }
+
+  function boxIcon(k){
+    var s = document.createElementNS(SVGNS, "svg"); s.setAttribute("viewBox", "0 0 50 50"); s.setAttribute("aria-label", k === "a" ? "caixa blava" : "caixa taronja");
+    var r = document.createElementNS(SVGNS, "rect");
+    r.setAttribute("x", 3); r.setAttribute("y", 3); r.setAttribute("width", 44); r.setAttribute("height", 44); r.setAttribute("rx", 8);
+    r.setAttribute("fill", k === "a" ? "var(--sky-soft)" : "var(--warm-soft)"); r.setAttribute("stroke", k === "a" ? "var(--sky)" : "var(--warm)"); r.setAttribute("stroke-width", 3);
+    var tx = document.createElementNS(SVGNS, "text");
+    tx.setAttribute("x", 25); tx.setAttribute("y", 33); tx.setAttribute("text-anchor", "middle"); tx.setAttribute("font-size", 24); tx.setAttribute("font-weight", 700);
+    tx.setAttribute("font-family", "Andika, sans-serif"); tx.setAttribute("fill", "var(--fg)"); tx.textContent = "?";
+    s.appendChild(r); s.appendChild(tx); return s;
+  }
+
+  // ---------- balances ----------
+  var PIVOT = { x:300, y:92 }, HALF = 190, HANG = 80;
+
+  function buildScales(){
+    var box = $("scales"); box.innerHTML = ""; scaleViews = [];
+    box.className = "scales" + (state.length > 1 ? " two" : "");
+    state.forEach(function(sc, si){
+      var wrap = document.createElement("div"); wrap.className = "scaleBox";
+      var svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 0 600 330");
+      svg.setAttribute("role", "img");
+      svg.innerHTML =
+        '<rect x="250" y="300" width="100" height="16" rx="6" fill="var(--rule)"/>' +
+        '<path d="M300 300 L282 300 L296 ' + (PIVOT.y + 6) + ' L304 ' + (PIVOT.y + 6) + ' L318 300 Z" fill="var(--rule)"/>' +
+        '<g class="beam"><rect x="' + (PIVOT.x - HALF) + '" y="' + (PIVOT.y - 6) + '" width="' + (HALF * 2) + '" height="12" rx="6" fill="var(--muted)"/>' +
+        '<polygon points="300,' + (PIVOT.y - 22) + ' 293,' + (PIVOT.y - 6) + ' 307,' + (PIVOT.y - 6) + '" fill="var(--accent)"/></g>' +
+        '<circle cx="300" cy="' + PIVOT.y + '" r="9" fill="var(--fg)"/>' +
+        '<g class="pan L"></g><g class="pan R"></g>';
+      var lab = document.createElement("p"); lab.className = "state";
+      wrap.appendChild(svg); wrap.appendChild(lab);
+      if (ch.palette && ch.palette.length){
+        var pals = document.createElement("div"); pals.className = "palettes";
+        [0, 1].forEach(function(side){
+          var p = document.createElement("div"); p.className = "palette";
+          var l = document.createElement("span"); l.className = "lbl"; l.textContent = side ? "Posa a la dreta" : "Posa a l'esquerra"; p.appendChild(l);
+          ch.palette.forEach(function(v){
+            var b = document.createElement("button"); b.type = "button"; b.className = "wbtn"; b.textContent = v;
+            b.setAttribute("aria-label", "Posa un " + v + (side ? " a la dreta" : " a l'esquerra"));
+            b.addEventListener("click", function(){ if (solved) return; sc[side].push(W(v)); changed(si); });
+            p.appendChild(b);
+          });
+          pals.appendChild(p);
+        });
+        wrap.appendChild(pals);
+      }
+      box.appendChild(wrap);
+      var view = { svg:svg, label:lab, angle:0, target:0, anim:null, si:si };
+      scaleViews.push(view);
+      drawPans(view); setAngle(view, targetAngle(si), true);
+    });
+  }
+
+  function targetAngle(si){
+    var vals = ch.vals || {};
+    var d = sum(state[si][1], vals) - sum(state[si][0], vals);   // positiu: pesa més la dreta
+    return Math.max(-14, Math.min(14, d * 3));
+  }
+
+  function endPoint(sign, ang){
+    var r = ang * Math.PI / 180;
+    return { x: PIVOT.x + sign * HALF * Math.cos(r), y: PIVOT.y + sign * HALF * Math.sin(r) };
+  }
+
+  function placePans(view){
+    var a = view.angle;
+    view.svg.querySelector(".beam").setAttribute("transform", "rotate(" + a + " " + PIVOT.x + " " + PIVOT.y + ")");
+    [["L", -1], ["R", 1]].forEach(function(p){
+      var e = endPoint(p[1], a);
+      view.svg.querySelector(".pan." + p[0]).setAttribute("transform", "translate(" + e.x + " " + e.y + ")");
+    });
+  }
+
+  function setAngle(view, target, instant){
+    view.target = target;
+    if (view.anim) cancelAnimationFrame(view.anim);
+    if (instant) { view.angle = target; placePans(view); label(view); return; }
+    var from = view.angle, t0 = null, dur = Taller.reducedMotion() ? 150 : 1100;
+    function step(ts){
+      if (t0 === null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // suau, sense rebot
+      view.angle = from + (target - from) * e; placePans(view);
+      if (k < 1) view.anim = requestAnimationFrame(step); else { view.anim = null; label(view); }
+    }
+    view.anim = requestAnimationFrame(step);
+  }
+
+  function label(view){
+    var t = view.target;
+    view.label.textContent = t === 0 ? "La balança està recta." : (t > 0 ? "Pesa més el plat de la dreta." : "Pesa més el plat de l'esquerra.");
+  }
+
+  function drawPans(view){
+    var sc = state[view.si];
+    ["L", "R"].forEach(function(name, side){
+      var g = view.svg.querySelector(".pan." + name); g.innerHTML = "";
+      var items = sc[side];
+      var plate = '<line x1="0" y1="0" x2="-80" y2="' + HANG + '" stroke="var(--muted)" stroke-width="2"/>' +
+                  '<line x1="0" y1="0" x2="80" y2="' + HANG + '" stroke="var(--muted)" stroke-width="2"/>' +
+                  '<path d="M-92 ' + HANG + ' L92 ' + HANG + ' L78 ' + (HANG + 14) + ' L-78 ' + (HANG + 14) + ' Z" fill="var(--rule)"/>' +
+                  '<circle cx="0" cy="0" r="5" fill="var(--muted)"/>';
+      g.insertAdjacentHTML("beforeend", plate);
+      var perRow = 4, size = 44, gap = 4;
+      items.forEach(function(it, i){
+        var row = Math.floor(i / perRow), col = i % perRow;
+        var inRow = Math.min(perRow, items.length - row * perRow);
+        var x = (col - (inRow - 1) / 2) * (size + gap);
+        var y = HANG - size / 2 - 2 - row * (size + gap);
+        var el = document.createElementNS(SVGNS, "g");
+        var removable = !solved && !(ch.fixed && it.orig);
+        el.setAttribute("class", "item" + (removable ? "" : " fixed"));
+        el.setAttribute("transform", "translate(" + x + " " + y + ")");
+        if (it.t === "w"){
+          el.innerHTML = '<circle r="21" fill="var(--warm-soft)" stroke="var(--warm)" stroke-width="3"/>' +
+            '<text y="8" text-anchor="middle" font-size="22" font-weight="700" font-family="Andika, sans-serif" fill="var(--fg)">' + it.v + '</text>';
+        } else {
+          var col1 = it.k === "a" ? "var(--sky)" : "var(--warm)", col2 = it.k === "a" ? "var(--sky-soft)" : "var(--sun-soft)";
+          el.innerHTML = '<rect x="-21" y="-21" width="42" height="42" rx="8" fill="' + col2 + '" stroke="' + col1 + '" stroke-width="3"/>' +
+            '<text y="8" text-anchor="middle" font-size="22" font-weight="700" font-family="Andika, sans-serif" fill="var(--fg)">' + (solved ? ch.vals[it.k] : "?") + '</text>';
+        }
+        if (removable){
+          el.addEventListener("click", function(){ sc[side].splice(i, 1); changed(view.si); });
+        }
+        g.appendChild(el);
+      });
+    });
+  }
+
+  function changed(si){
+    var view = scaleViews[si];
+    drawPans(view); setAngle(view, targetAngle(si));
+    Taller.msg($("msg"), "");
+    if (!ch.ask) setTimeout(checkBalanceGoal, Taller.reducedMotion() ? 200 : 1150);
+  }
+
+  function balanced(sc, vals){ return sum(sc[0], vals) === sum(sc[1], vals); }
+
+  function checkBalanceGoal(){
+    if (solved) return;
+    var sc = state[0], vals = ch.vals || {};
+    if (!balanced(sc, vals)) return;
+    if (ch.goal === "open"){
+      if (!sc[0].length || !sc[1].length) return;
+      var a = sc[0].map(function(i){ return i.v; }).sort().join(","), b = sc[1].map(function(i){ return i.v; }).sort().join(",");
+      if (a === b){ Taller.msg($("msg"), "Està recta, però els dos plats tenen els mateixos pesos. Prova-ho amb pesos diferents!", "think"); return; }
+    } else {
+      var orig = ch.scales[0];
+      if (sc[0].length === orig[0].length && sc[1].length === orig[1].length) return;
+    }
+    success();
+  }
+
+  function success(){
+    solved = true;
+    Taller.markDone(GAME, cid(li, ci));
+    scaleViews.forEach(drawPans);
+    var last = ci === LEVELS[li].ch.length - 1;
+    Taller.msg($("msg"), Taller.praise() + (ch.ask ? " Ja pots veure el pes de les caixes." : " La balança està recta.") + (last ? " Has acabat el nivell!" : ""), "good");
+    $("btnNext").hidden = false; $("btnNext").textContent = last ? "Tria un altre nivell" : "Següent repte →";
+    $("btnCheck").hidden = true; $("btnHint").disabled = true; $("btnReset").disabled = true;
+    Taller.dots($("dots"), LEVELS[li].ch.length, ci, function(i){ return Taller.done(GAME, cid(li, i)); });
+    $("btnNext").focus({ preventScroll:true });
+  }
+
+  function check(){
+    if (solved || !ch.ask) return;
+    var guess = {}, ok = true;
+    ch.ask.forEach(function(k){ guess[k] = answerSteppers[k].get(); if (guess[k] !== ch.vals[k]) ok = false; });
+    if (ok) return success();
+    // Explicar per què no quadra, sense donar la solució
+    var only = ch.ask.length === 1;
+    var useScales = state.every(function(s){ return balanced(s, ch.vals); }) ? state : (ch.scales.every(function(s){ return balanced(s, ch.vals); }) ? ch.scales : null);
+    if (!useScales){
+      Taller.msg($("msg"), "Encara no. Primer deixa la balança recta: posa pesos a l'altre plat fins que no s'inclini.", "think"); return;
+    }
+    var vals = Object.assign({}, ch.vals, guess);
+    for (var i = 0; i < useScales.length; i++){
+      var l = sum(useScales[i][0], vals), r = sum(useScales[i][1], vals);
+      if (l !== r){
+        var who = only ? "Si la caixa pesés " + guess[ch.ask[0]]
+                       : "Si la blava pesés " + guess.a + " i la taronja " + guess.b;
+        var where = useScales.length > 1 ? (i === 0 ? ", a la balança de l'esquerra" : ", a la balança de la dreta") : "";
+        Taller.msg($("msg"), who + where + ", el plat de l'esquerra pesaria " + l + " i el de la dreta " + r + ". No quadra, oi? Torna-ho a pensar.", "think");
+        return;
+      }
+    }
+    Taller.msg($("msg"), "Encara no. Torna-ho a mirar amb calma.", "think");
+  }
+
+  $("btnCheck").addEventListener("click", check);
+  $("btnHint").addEventListener("click", function(){
+    var h = ch.hints || [];
+    if (!h.length) return;
+    Taller.msg($("msg"), "Pista: " + h[Math.min(hintN, h.length - 1)], "think");
+    hintN++;
+  });
+  $("btnReset").addEventListener("click", function(){ if (!solved){ state = clone(ch.scales); buildScales(); Taller.msg($("msg"), ""); } });
+  $("btnNext").addEventListener("click", function(){
+    if (ci < LEVELS[li].ch.length - 1){ ci++; start(); } else showLevels();
+  });
+  $("btnLevels").addEventListener("click", showLevels);
+
+  showLevels();
+})();
+</script>
+</body>
+</html>

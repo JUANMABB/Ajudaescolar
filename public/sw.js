@@ -8,12 +8,18 @@
    Nunca se guarda ni se entrega una respuesta que venga de una redirección: Safari la rechaza
    al abrir una página y la web dejaría de funcionar sin conexión. */
 
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
 const CACHE = "ajudaescolar-" + VERSION;
 const FILES = [
   "./",
   "pruebas/lapiz",
   "pruebas/voces",
+  "taller/",
+  "taller/balances",
+  "taller/triangles",
+  "taller/cavall",
+  "assets/taller.css",
+  "assets/taller.js",
   "manifest.webmanifest",
   "assets/base.css",
   "assets/fonts/Andika-Regular.woff2",

@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#eef2f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Triangles i angles</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="stylesheet" href="../assets/base.css">
+<link rel="stylesheet" href="../assets/taller.css">
+<style>
+/* Quatre maneres de jugar: explorar, reptes de construir, l'angle amagat i Pitàgores.
+   El triangle es mou arrossegant els vèrtexs amb el dit o el llapis. */
+.board{width:100%;height:auto;display:block;background:var(--paper);border-radius:14px;border:2px solid var(--rule-soft);touch-action:none}
+.handle{cursor:grab}
+.sumbar{display:flex;height:40px;border-radius:12px;overflow:hidden;border:2px solid var(--rule-soft)}
+.sumbar div{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;min-width:0;overflow:hidden;transition:flex-basis .25s ease}
+.sumtext{font-family:var(--font-display);font-size:1.4rem;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.kind{text-align:center;color:var(--muted)}
+.cA{color:var(--sky)} .cB{color:var(--warm)} .cC{color:var(--plum)}
+.pyth{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,320px);gap:16px;align-items:start}
+@media (max-width:760px){.pyth{grid-template-columns:1fr}}
+.pyth .side{display:flex;flex-direction:column;gap:14px}
+.pyth label{font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="volver" href="./">← Taller</a>
+    <h1>Triangles i angles</h1>
+  </div>
+
+  <section id="menuView" class="wrap" style="gap:14px">
+    <p class="muted">Arrossega les puntes dels triangles per descobrir com funcionen els seus angles. Tria per on vols començar.</p>
+    <div class="levels" id="modes"></div>
+  </section>
+
+  <section id="playView" class="wrap" style="gap:14px" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="modeName"></h2>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="row"><button class="btn" id="btnMenu" type="button">Tria una altra manera de jugar</button></div>
+  </section>
+</div>
+
+<script src="../assets/taller.js"></script>
+<script>
+(function(){
+  var GAME = "triangles";
+  var $ = function(id){ return document.getElementById(id); };
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var COLORS = ["var(--sky)", "var(--warm)", "var(--plum)"], SOFT = ["var(--sky-soft)", "var(--warm-soft)", "var(--plum-soft)"];
+  var NAMES = ["A", "B", "C"];
+
+  var MODES = [
+    { id:"explora", name:"Explora", desc:"Mou el triangle i mira què passa amb els tres angles." },
+    { id:"reptes", name:"Reptes de construir", desc:"Fes triangles amb angles especials. I un que potser no es pot fer…" },
+    { id:"amagat", name:"L'angle amagat", desc:"Saps dos angles. Endevina el tercer sense mesurar." },
+    { id:"pitagores", name:"Pitàgores", desc:"Quatre triangles, un marc i un secret molt antic." }
+  ];
+
+  // ---------- geometria ----------
+  function sub(p, q){ return { x:p.x - q.x, y:p.y - q.y }; }
+  function len(v){ return Math.hypot(v.x, v.y); }
+  function angleAt(P, Q, R){
+    var u = sub(Q, P), v = sub(R, P);
+    var c = (u.x * v.x + u.y * v.y) / (len(u) * len(v));
+    return Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+  }
+  function rawAngles(V){ return [angleAt(V[0], V[1], V[2]), angleAt(V[1], V[2], V[0]), angleAt(V[2], V[0], V[1])]; }
+  // Arrodonits i que sumin exactament 180
+  function shownAngles(raw){
+    var r = raw.map(Math.round), d = 180 - (r[0] + r[1] + r[2]);
+    if (d !== 0){
+      var idx = [0, 1, 2].sort(function(i, j){ return Math.abs(raw[j] - r[j]) - Math.abs(raw[i] - r[i]); })[0];
+      r[idx] += d;
+    }
+    return r;
+  }
+  function area2(V){ return Math.abs((V[1].x - V[0].x) * (V[2].y - V[0].y) - (V[2].x - V[0].x) * (V[1].y - V[0].y)); }
+  function kindText(a){
+    var mx = Math.max.apply(null, a);
+    var k1 = mx === 90 ? "rectangle" : (mx > 90 ? "obtusangle" : "acutangle");
+    var eq = (a[0] === a[1]) + (a[1] === a[2]) + (a[0] === a[2]);
+    var k2 = eq === 3 ? "equilàter" : (eq >= 1 ? "isòsceles" : "escalè");
+    return "Triangle " + k1 + " i " + k2;
+  }
+
+  // Dibuixa l'arc (o el quadradet de l'angle recte) i l'etiqueta d'un angle
+  function angleMark(g, P, Q, R, i, text, shownDeg, opts){
+    opts = opts || {};
+    var u = sub(Q, P), v = sub(R, P), lu = len(u), lv = len(v);
+    u = { x:u.x / lu, y:u.y / lu }; v = { x:v.x / lv, y:v.y / lv };
+    var r = opts.r || 34, el;
+    if (shownDeg === 90){
+      var s = 22, p1 = { x:P.x + u.x * s, y:P.y + u.y * s }, p2 = { x:P.x + (u.x + v.x) * s, y:P.y + (u.y + v.y) * s }, p3 = { x:P.x + v.x * s, y:P.y + v.y * s };
+      el = document.createElementNS(SVGNS, "path");
+      el.setAttribute("d", "M" + P.x + " " + P.y + " L" + p1.x + " " + p1.y + " L" + p2.x + " " + p2.y + " L" + p3.x + " " + p3.y + " Z");
+    } else {
+      var a1 = { x:P.x + u.x * r, y:P.y + u.y * r }, a2 = { x:P.x + v.x * r, y:P.y + v.y * r };
+      var sweep = (u.x * v.y - u.y * v.x) > 0 ? 1 : 0;
+      el = document.createElementNS(SVGNS, "path");
+      el.setAttribute("d", "M" + P.x + " " + P.y + " L" + a1.x + " " + a1.y + " A" + r + " " + r + " 0 0 " + sweep + " " + a2.x + " " + a2.y + " Z");
+    }
+    el.setAttribute("fill", SOFT[i]); el.setAttribute("stroke", COLORS[i]); el.setAttribute("stroke-width", 2);
+    g.appendChild(el);
+    if (text != null){
+      var bis = { x:u.x + v.x, y:u.y + v.y }, lb = len(bis) || 1;
+      var d = opts.labelDist || 64;
+      var t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", P.x + bis.x / lb * d); t.setAttribute("y", P.y + bis.y / lb * d + 8);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", opts.size || 24); t.setAttribute("font-weight", 700);
+      t.setAttribute("font-family", "Andika, sans-serif"); t.setAttribute("fill", COLORS[i]);
+      t.textContent = text; g.appendChild(t);
+    }
+  }
+
+  // ---------- triangle que es pot arrossegar ----------
+  function dragTriangle(container, V, onChange, onRelease, opts){
+    opts = opts || {};
+    var W = 640, H = 440, SNAP = 20;
+    var svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("class", "board");
+    svg.setAttribute("aria-label", "Triangle. Arrossega les tres puntes per canviar-lo.");
+    var grid = "";
+    for (var x = SNAP; x < W; x += SNAP) for (var y = SNAP; y < H; y += SNAP) grid += "M" + x + " " + y + "h0.01";
+    svg.innerHTML = '<path d="' + grid + '" stroke="var(--rule)" stroke-width="3" stroke-linecap="round" opacity=".55"/>';
+    var shape = document.createElementNS(SVGNS, "polygon");
+    shape.setAttribute("fill", "var(--accent-soft)"); shape.setAttribute("stroke", "var(--fg)"); shape.setAttribute("stroke-width", 3); shape.setAttribute("stroke-linejoin", "round");
+    var marks = document.createElementNS(SVGNS, "g");
+    var handles = document.createElementNS(SVGNS, "g");
+    svg.appendChild(shape); svg.appendChild(marks); svg.appendChild(handles);
+    container.appendChild(svg);
+
+    var hs = V.map(function(_, i){
+      var g = document.createElementNS(SVGNS, "g"); g.setAttribute("class", "handle");
+      g.innerHTML = '<circle r="30" fill="transparent"/><circle r="13" fill="' + COLORS[i] + '" stroke="var(--paper)" stroke-width="3"/>';
+      handles.appendChild(g); return g;
+    });
+
+    function draw(){
+      shape.setAttribute("points", V.map(function(p){ return p.x + "," + p.y; }).join(" "));
+      marks.innerHTML = "";
+      var raw = rawAngles(V), sh = shownAngles(raw);
+      for (var i = 0; i < 3; i++){
+        angleMark(marks, V[i], V[(i + 1) % 3], V[(i + 2) % 3], i, opts.hideNumbers && opts.hideNumbers() ? null : sh[i] + "°", sh[i]);
+      }
+      hs.forEach(function(g, i){ g.setAttribute("transform", "translate(" + V[i].x + " " + V[i].y + ")"); });
+      if (onChange) onChange(sh, raw);
+    }
+
+    var drag = null;
+    function toSvg(e){
+      var pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    hs.forEach(function(g, i){
+      g.addEventListener("pointerdown", function(e){
+        e.preventDefault(); drag = { i:i, id:e.pointerId };
+        try { svg.setPointerCapture(e.pointerId); } catch(err){}
+      });
+    });
+    svg.addEventListener("pointermove", function(e){
+      if (!drag || e.pointerId !== drag.id) return;
+      var p = toSvg(e);
+      var nx = Math.max(SNAP, Math.min(W - SNAP, Math.round(p.x / SNAP) * SNAP));
+      var ny = Math.max(SNAP, Math.min(H - SNAP, Math.round(p.y / SNAP) * SNAP));
+      if (nx === V[drag.i].x && ny === V[drag.i].y) return;
+      var old = V[drag.i]; V[drag.i] = { x:nx, y:ny };
+      if (area2(V) < 1600) { V[drag.i] = old; return; }   // que no quedi aplanat
+      draw();
+    });
+    function end(e){ if (drag && e.pointerId === drag.id){ drag = null; if (onRelease) onRelease(); } }
+    svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+
+    draw();
+    return { redraw:draw, svg:svg };
+  }
+
+  function startTriangle(){ return [{ x:160, y:360 }, { x:500, y:360 }, { x:300, y:120 }]; }
+
+  // ---------- menú ----------
+  var REPTES = [
+    { text:"Fes un triangle que tingui un angle recte (90°).", ok:function(a){ return a.indexOf(90) >= 0; } },
+    { text:"Fes un triangle amb un angle obtús: més gran que 90°.", ok:function(a){ return Math.max.apply(null, a) > 90; } },
+    { text:"Fes un triangle amb dos angles iguals.", ok:function(a){ return a[0] === a[1] || a[1] === a[2] || a[0] === a[2]; } },
+    { text:"Fes un triangle amb un angle de 45°.", ok:function(a){ return a.indexOf(45) >= 0; } },
+    { text:"Fes un triangle rectangle que també tingui dos angles iguals.", ok:function(a){ return a.indexOf(90) >= 0 && (a[0] === a[1] || a[1] === a[2] || a[0] === a[2]); } },
+    { text:"Fes un triangle amb els tres angles gairebé iguals. Quant fa cada un?", ok:function(a, raw){ return raw.every(function(x){ return Math.abs(x - 60) <= 2.5; }); },
+      after:"Els tres fan 60°, perquè 60 + 60 + 60 = 180." },
+    { text:"Pots fer un triangle amb dos angles rectes? Prova-ho.", impossible:true }
+  ];
+
+  function showMenu(){
+    $("playView").hidden = true; $("menuView").hidden = false;
+    var box = $("modes"); box.innerHTML = "";
+    MODES.forEach(function(m, i){
+      var b = document.createElement("button"); b.type = "button"; b.className = "level";
+      b.innerHTML = '<span class="n">' + (i + 1) + '</span><span class="t"></span><span class="d"></span><span class="done"></span>';
+      b.querySelector(".t").textContent = m.name; b.querySelector(".d").textContent = m.desc;
+      var done = "";
+      if (m.id === "reptes"){ var n = Taller.countDone(GAME, REPTES.map(function(_, k){ return "r" + k; })); done = n === REPTES.length ? "Fet!" : (n ? n + " de " + REPTES.length + " reptes" : REPTES.length + " reptes"); }
+      if (m.id === "amagat" && Taller.done(GAME, "amagat")) done = "Fet!";
+      if (m.id === "pitagores" && Taller.done(GAME, "pitagores")) done = "Fet!";
+      b.querySelector(".done").textContent = done;
+      b.addEventListener("click", function(){ open(m); });
+      box.appendChild(b);
+    });
+    window.scrollTo(0, 0);
+  }
+
+  function open(m){
+    $("menuView").hidden = true; $("playView").hidden = false;
+    $("modeName").textContent = m.name; $("dots").innerHTML = "";
+    var st = $("stage"); st.innerHTML = "";
+    ({ explora:explora, reptes:reptes, amagat:amagat, pitagores:pitagores })[m.id](st);
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- 1. Explora ----------
+  function explora(st){
+    var hide = false;
+    st.insertAdjacentHTML("beforeend", '<p class="ask">Arrossega les tres puntes. Què passa sempre amb la suma dels angles?</p>');
+    var holder = document.createElement("div"); st.appendChild(holder);
+    st.insertAdjacentHTML("beforeend", '<div class="sumbar" id="bar"><div style="background:var(--sky-soft)"></div><div style="background:var(--warm-soft)"></div><div style="background:var(--plum-soft)"></div></div><p class="sumtext" id="sumtext"></p><p class="kind" id="kind"></p><div class="row"><button class="btn soft" id="btnHide" type="button">Amaga els nombres</button></div>');
+    var tri = dragTriangle(holder, startTriangle(), function(a){
+      var bar = st.querySelector("#bar").children;
+      for (var i = 0; i < 3; i++){ bar[i].style.flexBasis = (a[i] / 180 * 100) + "%"; bar[i].textContent = hide ? "" : a[i] + "°"; bar[i].style.color = COLORS[i]; }
+      st.querySelector("#sumtext").innerHTML = hide ? "? + ? + ? = ?"
+        : '<span class="cA">' + a[0] + '°</span> + <span class="cB">' + a[1] + '°</span> + <span class="cC">' + a[2] + '°</span> = 180°';
+      st.querySelector("#kind").textContent = kindText(a);
+    }, null, { hideNumbers:function(){ return hide; } });
+    st.querySelector("#btnHide").addEventListener("click", function(){
+      hide = !hide; this.textContent = hide ? "Mostra els nombres" : "Amaga els nombres"; tri.redraw();
+    });
+  }
+
+  // ---------- 2. Reptes de construir ----------
+  function reptes(st){
+    var k = 0;
+    for (var i = 0; i < REPTES.length; i++){ if (!Taller.done(GAME, "r" + i)) { k = i; break; } }
+    function run(){
+      st.innerHTML = "";
+      var R = REPTES[k], solved = false;
+      Taller.dots($("dots"), REPTES.length, k, function(i){ return Taller.done(GAME, "r" + i); });
+      st.insertAdjacentHTML("beforeend", '<p class="ask"></p>'); st.querySelector(".ask").textContent = R.text;
+      var holder = document.createElement("div"); st.appendChild(holder);
+      st.insertAdjacentHTML("beforeend", '<p class="kind" id="kind"></p><div class="msg" id="msg" role="status" aria-live="polite"></div><div class="row" id="btns"></div>');
+      var btns = st.querySelector("#btns"), msg = st.querySelector("#msg");
+      var next = document.createElement("button"); next.type = "button"; next.className = "btn primary"; next.hidden = true;
+      next.textContent = k < REPTES.length - 1 ? "Següent repte →" : "Tornar a començar els reptes";
+      next.addEventListener("click", function(){ k = (k + 1) % REPTES.length; run(); });
+      var last = null, lastRaw = null;
+      function win(extra){
+        if (solved) return; solved = true; Taller.markDone(GAME, "r" + k);
+        Taller.msg(msg, Taller.praise() + (extra ? " " + extra : ""), "good"); next.hidden = false;
+        Taller.dots($("dots"), REPTES.length, k, function(i){ return Taller.done(GAME, "r" + i); });
+      }
+      dragTriangle(holder, startTriangle(), function(a, raw){ last = a; lastRaw = raw; st.querySelector("#kind").textContent = kindText(a); },
+        function(){ if (!R.impossible && !solved && R.ok(last, lastRaw)) win(R.after); });
+      if (R.impossible){
+        var no = document.createElement("button"); no.type = "button"; no.className = "btn soft"; no.textContent = "Crec que no es pot fer";
+        no.addEventListener("click", function(){
+          win("Tens raó: no es pot. Dos angles rectes ja sumen 90 + 90 = 180°, i per al tercer angle no quedaria res. Un triangle no es podria tancar.");
+          no.disabled = true;
+        });
+        btns.appendChild(no);
+      }
+      btns.appendChild(next);
+    }
+    run();
+  }
+
+  // ---------- 3. L'angle amagat ----------
+  function amagat(st){
+    var ROUNDS = 6, k = 0, doneSet = {};
+    function makeAngles(){
+      var a, b, c;
+      do { a = 25 + 5 * Math.floor(Math.random() * 20); b = 25 + 5 * Math.floor(Math.random() * 20); c = 180 - a - b; } while (c < 25);
+      if (k === 1){ a = 90; b = 5 * (5 + Math.floor(Math.random() * 9)); c = 90 - b; }   // un de rectangle
+      return [a, b, c];
+    }
+    function verts(ang){
+      // costat AB horitzontal; C es calcula amb els angles (teorema del sinus)
+      var r = Math.PI / 180, L = 100;
+      var AC = L * Math.sin(ang[1] * r) / Math.sin(ang[2] * r);
+      var P = [{ x:0, y:0 }, { x:L, y:0 }, { x:AC * Math.cos(ang[0] * r), y:-AC * Math.sin(ang[0] * r) }];
+      var minx = Math.min(P[0].x, P[1].x, P[2].x), maxx = Math.max(P[0].x, P[1].x, P[2].x), miny = Math.min(P[0].y, P[1].y, P[2].y), maxy = Math.max(P[0].y, P[1].y, P[2].y);
+      var s = Math.min(520 / (maxx - minx), 330 / (maxy - miny));
+      var ox = (640 - (maxx - minx) * s) / 2, oy = (440 - (maxy - miny) * s) / 2;
+      return P.map(function(p){ return { x:ox + (p.x - minx) * s, y:oy + (p.y - miny) * s }; });
+    }
+    function run(){
+      st.innerHTML = "";
+      Taller.dots($("dots"), ROUNDS, k, function(i){ return !!doneSet[i]; });
+      var ang = makeAngles(), V = verts(ang), hid = Math.floor(Math.random() * 3), solved = false;
+      st.insertAdjacentHTML("beforeend", '<p class="ask">Quant fa l\'angle amagat? No el mesuris: pensa-ho.</p>');
+      var svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 0 640 440"); svg.setAttribute("class", "board");
+      svg.setAttribute("aria-label", "Triangle amb dos angles coneguts i un d'amagat");
+      var poly = document.createElementNS(SVGNS, "polygon");
+      poly.setAttribute("points", V.map(function(p){ return p.x + "," + p.y; }).join(" "));
+      poly.setAttribute("fill", "var(--accent-soft)"); poly.setAttribute("stroke", "var(--fg)"); poly.setAttribute("stroke-width", 3); poly.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(poly);
+      var marks = document.createElementNS(SVGNS, "g"); svg.appendChild(marks);
+      function drawMarks(reveal){
+        marks.innerHTML = "";
+        for (var i = 0; i < 3; i++){
+          // angle real de cada vèrtex del dibuix
+          var real = Math.round(angleAt(V[i], V[(i + 1) % 3], V[(i + 2) % 3]));
+          var idx = [0, 1, 2].filter(function(j){ return Math.abs(ang[j] - real) <= 1; })[0];
+          var val = idx == null ? real : ang[idx];
+          angleMark(marks, V[i], V[(i + 1) % 3], V[(i + 2) % 3], i, (i === hid && !reveal) ? "?" : val + "°", val, { r:40, labelDist:74, size:28 });
+        }
+      }
+      drawMarks(false); st.appendChild(svg);
+      var hiddenVal = (function(){ var real = Math.round(angleAt(V[hid], V[(hid + 1) % 3], V[(hid + 2) % 3])); var m = ang.filter(function(x){ return Math.abs(x - real) <= 1; }); return m.length ? m[0] : real; })();
+      var known = [0, 1, 2].filter(function(i){ return i !== hid; }).map(function(i){ var real = Math.round(angleAt(V[i], V[(i + 1) % 3], V[(i + 2) % 3])); var m = ang.filter(function(x){ return Math.abs(x - real) <= 1; }); return m.length ? m[0] : real; });
+      st.insertAdjacentHTML("beforeend", '<div class="row"><span style="font-weight:700">L\'angle amagat fa</span><div id="stp"></div><button class="btn soft" type="button" id="m10">−10</button><button class="btn soft" type="button" id="p10">+10</button></div><div class="msg" id="msg" role="status" aria-live="polite"></div><div class="row" id="btns"></div>');
+      var stp = Taller.stepper(st.querySelector("#stp"), { min:0, max:180, value:60, unit:"°" });
+      st.querySelector("#m10").addEventListener("click", function(){ stp.set(Math.max(0, stp.get() - 10)); });
+      st.querySelector("#p10").addEventListener("click", function(){ stp.set(Math.min(180, stp.get() + 10)); });
+      var msg = st.querySelector("#msg"), btns = st.querySelector("#btns");
+      var chk = document.createElement("button"); chk.type = "button"; chk.className = "btn primary"; chk.textContent = "Comprova";
+      var hint = document.createElement("button"); hint.type = "button"; hint.className = "btn soft"; hint.textContent = "Una pista";
+      var next = document.createElement("button"); next.type = "button"; next.className = "btn primary"; next.hidden = true;
+      next.textContent = k < ROUNDS - 1 ? "Següent triangle →" : "Una altra ronda";
+      chk.addEventListener("click", function(){
+        if (solved) return;
+        var g = stp.get(), tot = known[0] + known[1] + g;
+        if (g === hiddenVal){
+          solved = true; doneSet[k] = 1; drawMarks(true);
+          Taller.msg(msg, Taller.praise() + " " + known[0] + " + " + known[1] + " + " + g + " = 180°.", "good");
+          chk.hidden = true; hint.hidden = true; next.hidden = false;
+          Taller.dots($("dots"), ROUNDS, k, function(i){ return !!doneSet[i]; });
+          if (Object.keys(doneSet).length >= ROUNDS) Taller.markDone(GAME, "amagat");
+        } else {
+          Taller.msg(msg, "Amb el teu nombre, els tres angles sumen " + tot + "°. Han de fer 180°. Torna-ho a provar.", "think");
+        }
+      });
+      hint.addEventListener("click", function(){ Taller.msg(msg, "Pista: els tres angles d'un triangle sempre sumen 180°. Quant sumen els dos que ja saps?", "think"); });
+      next.addEventListener("click", function(){ if (k < ROUNDS - 1) k++; else { k = 0; doneSet = {}; } run(); });
+      btns.appendChild(chk); btns.appendChild(hint); btns.appendChild(next);
+    }
+    run();
+  }
+
+  // ---------- 4. Pitàgores ----------
+  function pitagores(st){
+    var a = 3, b = 4, arr = 1, anim = null, solved = false;
+    st.innerHTML =
+      '<div class="pyth"><div id="pic"></div><div class="side">' +
+      '<p class="ask">Quatre triangles iguals dins d\'un marc quadrat. Els pots moure.</p>' +
+      '<div class="row"><label>Costat curt</label><div id="sa"></div></div>' +
+      '<div class="row"><label>Costat llarg</label><div id="sb"></div></div>' +
+      '<button class="btn soft" type="button" id="move">Mou els triangles</button>' +
+      '<p id="txt"></p>' +
+      '<div class="row"><span style="font-weight:700">Quadrets lliures:</span><div id="sq"></div></div>' +
+      '<div class="row"><button class="btn primary" type="button" id="chk">Comprova</button></div>' +
+      '<div class="msg" id="msg" role="status" aria-live="polite"></div>' +
+      '</div></div>';
+    var svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 0 400 400"); svg.setAttribute("class", "board");
+    svg.setAttribute("aria-label", "Marc quadrat amb quatre triangles i l'espai lliure acolorit");
+    st.querySelector("#pic").appendChild(svg);
+    var msg = st.querySelector("#msg");
+
+    function layout(){
+      var s = a + b, P1 = [a, 0], P2 = [s, a], P3 = [s - a, s], P4 = [0, s - a];
+      // [angle recte, punta del costat curt, punta del costat llarg]
+      var one = [[[0, 0], P1, P4], [[s, 0], P2, P1], [[s, s], P3, P2], [[0, s], P4, P3]];
+      var two = [[[a, a], [a, 0], [s, a]], [[s, 0], [s, a], [a, 0]], [[a, a], [0, a], [a, s]], [[0, s], [a, s], [0, a]]];
+      return { s:s, one:one, two:two, free1:[P1, P2, P3, P4], free2:[[[0, 0], [a, 0], [a, a], [0, a]], [[a, a], [s, a], [s, s], [a, s]]] };
+    }
+
+    function draw(t){
+      var L = layout(), cell = 360 / L.s, o = 20;
+      function X(p){ return (o + p[0] * cell) + "," + (o + p[1] * cell); }
+      var html = "";
+      // espai lliure (només quan els triangles estan quiets)
+      if (t === 0 || t === 1){
+        var free = (arr === 1) === (t === 0) ? [L.free1] : L.free2;
+        free.forEach(function(f){ html += '<polygon points="' + f.map(X).join(" ") + '" fill="var(--sky-soft)" stroke="var(--sky)" stroke-width="3"/>'; });
+      }
+      // quadrícula
+      for (var i = 0; i <= L.s; i++){
+        html += '<line x1="' + o + '" y1="' + (o + i * cell) + '" x2="' + (o + 360) + '" y2="' + (o + i * cell) + '" stroke="var(--rule)" stroke-width="1"/>';
+        html += '<line x1="' + (o + i * cell) + '" y1="' + o + '" x2="' + (o + i * cell) + '" y2="' + (o + 360) + '" stroke="var(--rule)" stroke-width="1"/>';
+      }
+      // triangles (interpolats durant el moviment)
+      var from = arr === 1 ? L.one : L.two, to = arr === 1 ? L.two : L.one;
+      for (var k = 0; k < 4; k++){
+        var pts = [0, 1, 2].map(function(j){ return [from[k][j][0] + (to[k][j][0] - from[k][j][0]) * t, from[k][j][1] + (to[k][j][1] - from[k][j][1]) * t]; });
+        html += '<polygon points="' + pts.map(X).join(" ") + '" fill="var(--warm-soft)" stroke="var(--warm)" stroke-width="3" stroke-linejoin="round" opacity=".95"/>';
+      }
+      html += '<rect x="' + o + '" y="' + o + '" width="360" height="360" fill="none" stroke="var(--fg)" stroke-width="4"/>';
+      svg.innerHTML = html;
+      st.querySelector("#txt").textContent = arr === 1
+        ? "Ara l'espai lliure (blau) és un quadrat inclinat. Mou els triangles i mira com queda."
+        : "Ara l'espai lliure són dos quadrats. El marc i els triangles són els mateixos que abans!";
+    }
+
+    function moveTriangles(){
+      if (anim) return;
+      var t0 = null, dur = Taller.reducedMotion() ? 150 : 1400;
+      function step(ts){
+        if (t0 === null) t0 = ts;
+        var k = Math.min(1, (ts - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        draw(k < 1 ? Math.max(0.001, Math.min(0.999, e)) : 1);
+        if (k < 1) anim = requestAnimationFrame(step); else { anim = null; arr = arr === 1 ? 2 : 1; draw(0); }
+      }
+      anim = requestAnimationFrame(step);
+    }
+
+    var sa = Taller.stepper(st.querySelector("#sa"), { min:1, max:5, value:a, onChange:function(v){ a = v; if (b < a) sb.set(a); else reset(); } });
+    var sb = Taller.stepper(st.querySelector("#sb"), { min:1, max:6, value:b, onChange:function(v){ b = v; if (b < a){ sb.set(a); return; } reset(); } });
+    var sq = Taller.stepper(st.querySelector("#sq"), { min:0, max:80, value:0 });
+    function reset(){ if (anim) return; solved = false; Taller.msg(msg, ""); draw(0); }
+    st.querySelector("#move").addEventListener("click", moveTriangles);
+    st.querySelector("#chk").addEventListener("click", function(){
+      var right = a * a + b * b, g = sq.get();
+      if (g === right){
+        solved = true; Taller.markDone(GAME, "pitagores");
+        Taller.msg(msg, Taller.praise() + " " + a + "×" + a + " + " + b + "×" + b + " = " + (a * a) + " + " + (b * b) + " = " + right + ". I com que l'espai lliure és el mateix en les dues posicions, el quadrat inclinat també té " + right + " quadrets. Això és el teorema de Pitàgores! Prova-ho amb altres costats.", "good");
+      } else {
+        Taller.msg(msg, arr === 1 ? "Encara no. Costa comptar el quadrat inclinat… Mou els triangles: amb dos quadrats rectes és més fàcil." : "Encara no. Compta els quadrets de cada quadrat blau i suma'ls.", "think");
+      }
+    });
+    draw(0);
+  }
+
+  $("btnMenu").addEventListener("click", showMenu);
+  showMenu();
+})();
+</script>
+</body>
+</html>
