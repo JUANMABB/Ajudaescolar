@@ -3,14 +3,14 @@
 Entorno web de aprendizaje para primaria (Cataluña), pensado para iPad con Apple Pencil.
 
 ## Estado
-Fase de pruebas técnicas, con un primer taller de juegos (versión 0.2.0):
+Fase de pruebas técnicas, con un primer taller de juegos (versión 0.3.0):
 
 | Página | Para qué |
 |---|---|
 | `public/index.html` | Inicio para los padres: comprobaciones automáticas del iPad y prueba del modo infantil |
 | `public/pruebas/lapiz.html` | Escritura con Apple Pencil: fluidez, presión, inclinación, palma, dedo, página quieta |
 | `public/pruebas/voces.html` | Voces del iPad para dictados en catalán, castellano e inglés |
-| `public/taller/` | Taller de reptes para el niño, en catalán: balanzas misteriosas (álgebra), triángulos y ángulos (180°, ángulo escondido, Pitágoras) y el caballo saltador (ajedrez y lógica) |
+| `public/taller/` | Taller de reptes para el niño, en catalán: balanzas misteriosas (álgebra), triángulos y ángulos (180°, ángulo escondido, Pitágoras) el caballo saltador (ajedrez y lógica), el espejo (simetrías), qué hora es (horas en catalán), fracciones iguales y el robot programador (bloques y función, como el Cubetto) |
 
 ## Cómo está hecho
 - Web estática: HTML, CSS y JavaScript sin herramientas de compilación. Lo que hay en el repositorio es exactamente lo que se publica.

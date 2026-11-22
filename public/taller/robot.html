@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#eef2f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>El robot programador</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="stylesheet" href="../assets/base.css">
+<link rel="stylesheet" href="../assets/taller.css">
+<style>
+/* Tauler amb el robot a l'esquerra; a la dreta, el programa (línia principal i línia de la funció) i els blocs.
+   Com el Cubetto: el bloc ★ fa tot el que hi ha a la línia de la funció. */
+.play{display:grid;grid-template-columns:minmax(0,480px) minmax(260px,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.play{grid-template-columns:1fr}}
+.boardWrap{position:relative;width:100%;max-width:480px;aspect-ratio:1/1}
+.board{display:grid;width:100%;height:100%;gap:3px;padding:3px;border-radius:14px;background:var(--rule-soft)}
+.cell{border-radius:6px;background:var(--paper);display:flex;align-items:center;justify-content:center;min-width:0}
+.cell .star{font-size:min(7vw,36px);color:var(--sun);line-height:1}
+.cell .rock{width:60%;height:60%;border-radius:50% 45% 50% 40%;background:var(--muted);opacity:.75}
+.cell.trail{background:var(--accent-soft)}
+.bot{position:absolute;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:left .45s ease, top .45s ease}
+.bot svg{width:72%;height:72%;transition:transform .45s ease}
+@media (prefers-reduced-motion: reduce){.bot,.bot svg{transition-duration:.1s}}
+.side{display:flex;flex-direction:column;gap:12px}
+.line{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:14px;border:2px solid var(--rule-soft);background:var(--paper);cursor:pointer;text-align:left}
+.line.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.line .lbl{font-size:15px;color:var(--muted);font-weight:700}
+.slots{display:flex;flex-wrap:wrap;gap:6px;min-height:56px}
+.slot,.blk{width:52px;height:52px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:2px solid var(--rule)}
+.slot.empty{border-style:dashed;background:transparent}
+.slot.full,.blk{background:var(--surface)}
+.slot.now{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.blk.F,.slot.F{border-color:var(--sky)} .blk.L,.slot.L,.blk.R,.slot.R{border-color:var(--warm)} .blk.P,.slot.P{border-color:var(--plum);color:var(--plum)}
+.slot.now.P{color:var(--paper)}
+.palette{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="volver" href="./">← Taller</a>
+    <h1>El robot programador</h1>
+  </div>
+
+  <section id="levelsView" class="wrap" style="gap:14px">
+    <p class="muted">Fes un programa amb blocs perquè el robot arribi a l'estrella. ↑ avança una casella, ↺ i ↻ giren el robot, i ★ fa tot el que hi ha a la línia de la funció, com al Cubetto.</p>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <section id="playView" class="wrap" style="gap:14px" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="levelName"></h2>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="stage">
+      <div class="play">
+        <div class="boardWrap"><div class="board" id="board"></div><div class="bot" id="bot"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="8" fill="var(--sky-soft)" stroke="var(--sky)" stroke-width="3"/><path d="M14 13 L28 20 L14 27 Z" fill="var(--sky)"/></svg></div></div>
+        <div class="side">
+          <p class="ask" id="ask"></p>
+          <button type="button" class="line active" id="lineMain"><span class="lbl" id="lblMain"></span><span class="slots" id="slotsMain"></span></button>
+          <button type="button" class="line" id="lineFn" hidden><span class="lbl" id="lblFn"></span><span class="slots" id="slotsFn"></span></button>
+          <div class="palette" id="palette"></div>
+          <div class="msg" id="msg" role="status" aria-live="polite"></div>
+          <div class="row">
+            <button class="btn primary" id="btnRun" type="button">Executa ▶</button>
+            <button class="btn primary" id="btnNext" type="button" hidden>Següent repte →</button>
+            <button class="btn" id="btnClear" type="button">Esborra el programa</button>
+            <button class="btn" id="btnLevels" type="button">Tria nivell</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="../assets/taller.js"></script>
+<script>
+(function(){
+  var GAME = "robot";
+  var $ = function(id){ return document.getElementById(id); };
+  var DIRS = [[1,0],[0,1],[-1,0],[0,-1]];   // 0 dreta, 1 avall, 2 esquerra, 3 amunt
+  var ICON = { F:"↑", L:"↺", R:"↻", P:"★" }, NAME = { F:"avança", L:"gira a l'esquerra", R:"gira a la dreta", P:"fes la funció" };
+
+  // n: mida; s: inici [x, y, direcció]; g: estrella; r: pedres; m: blocs màxims a la línia principal; f: blocs de la funció (0 = sense funció)
+  // sol: una solució possible (només per comprovar que el repte es pot fer; no es mostra mai)
+  var LEVELS = [
+    { name:"Endavant i girs", desc:"Els primers programes: avançar i girar.", ch:[
+      { n:5, s:[0,2,0], g:[3,2], m:6, f:0, sol:["FFF",""] },
+      { n:5, s:[0,4,0], g:[2,1], m:8, f:0, sol:["FFLFFF",""] },
+      { n:5, s:[0,0,0], g:[4,4], m:10, f:0, r:[[2,0]], sol:["RFFFFLFFFF",""] },
+      { n:5, s:[4,4,3], g:[0,0], m:10, f:0, sol:["FFFFLFFFF",""] }
+    ]},
+    { name:"Pedres al camí", desc:"Esquiva les pedres per arribar a l'estrella.", ch:[
+      { n:5, s:[0,2,0], g:[4,2], m:10, f:0, r:[[2,2]], sol:["FLFRFFRFLF",""] },
+      { n:6, s:[0,5,3], g:[5,0], m:12, f:0, r:[[0,2],[3,1],[3,0]], sol:["FFRFFFFFLFFF",""] },
+      { n:6, s:[2,5,3], g:[3,0], m:12, f:0, r:[[2,2],[3,3],[4,1]], sol:["FFLFRFFFRFF",""] }
+    ]},
+    { name:"La funció ★", desc:"Pocs blocs a la línia principal: fes servir la funció.", ch:[
+      { n:7, s:[0,3,0], g:[6,3], m:3, f:4, sol:["PP","FFF"] },
+      { n:7, s:[0,6,0], g:[3,3], m:3, f:4, sol:["PPP","FLFR"] },
+      { n:7, s:[0,0,0], g:[6,6], m:5, f:4, sol:["PPRPP","FFF"] },
+      { n:7, s:[0,6,0], g:[4,2], m:4, f:4, sol:["PPPP","FLFR"] }
+    ]},
+    { name:"Repte de mestre", desc:"Laberints on la funció t'ajuda molt.", ch:[
+      { n:7, s:[0,6,0], g:[6,0], m:6, f:4, r:[[3,6],[6,3],[0,3]], sol:["PPPPPP","FLFR"] },
+      { n:7, s:[3,6,3], g:[3,0], m:6, f:4, r:[[3,3]], sol:["RPPRPP","FFFL"] }
+    ]}
+  ];
+
+  var li, ci, ch, prog, active, running, solved, cellSize;
+
+  function showLevels(){
+    $("playView").hidden = true; $("levelsView").hidden = false;
+    Taller.levelCards($("levels"), GAME, LEVELS, function(l, c){ li = l; ci = c; start(); });
+    window.scrollTo(0, 0);
+  }
+  function dots(){ Taller.dots($("dots"), LEVELS[li].ch.length, ci, function(i){ return Taller.done(GAME, "L" + li + "-" + i); }); }
+  function isRock(x, y){ return (ch.r || []).some(function(r){ return r[0] === x && r[1] === y; }); }
+
+  function start(){
+    $("levelsView").hidden = true; $("playView").hidden = false;
+    var L = LEVELS[li]; ch = L.ch[ci];
+    $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name; dots();
+    $("ask").textContent = "Porta el robot fins a l'estrella." + (ch.f ? " La línia principal només té " + ch.m + " llocs: fes servir la funció ★." : "");
+    prog = { main:[], fn:[] }; active = "main"; running = false; solved = false;
+    $("lineFn").hidden = !ch.f;
+    $("btnNext").hidden = true; $("btnRun").hidden = false;
+    Taller.msg($("msg"), "");
+    drawBoard(); place(ch.s[0], ch.s[1], ch.s[2], true); drawProg(); drawPalette();
+    window.scrollTo(0, 0);
+  }
+
+  function drawBoard(trail){
+    var b = $("board"); b.innerHTML = ""; b.style.gridTemplateColumns = "repeat(" + ch.n + ",1fr)";
+    trail = trail || {};
+    for (var y = 0; y < ch.n; y++) for (var x = 0; x < ch.n; x++){
+      var c = document.createElement("div"); c.className = "cell" + (trail[x + "," + y] ? " trail" : "");
+      if (ch.g[0] === x && ch.g[1] === y) c.innerHTML = '<span class="star">★</span>';
+      else if (isRock(x, y)) c.innerHTML = '<span class="rock"></span>';
+      b.appendChild(c);
+    }
+  }
+
+  function place(x, y, d, instant){
+    var bot = $("bot"), pct = 100 / ch.n, pad = 3 / ($("board").clientWidth || 480) * 100;
+    if (instant){ bot.style.transition = "none"; bot.querySelector("svg").style.transition = "none"; }
+    bot.style.width = pct + "%"; bot.style.height = pct + "%";
+    bot.style.left = (x * pct) + "%"; bot.style.top = (y * pct) + "%";
+    bot._rot = bot._rot == null ? d * 90 : bot._rot;
+    // Gir pel camí curt
+    var target = d * 90, cur = instant ? target : bot._rot, diff = ((target - cur) % 360 + 540) % 360 - 180;
+    bot._rot = instant ? target : cur + diff;
+    bot.querySelector("svg").style.transform = "rotate(" + bot._rot + "deg)";
+    if (instant){ bot.offsetWidth; bot.style.transition = ""; bot.querySelector("svg").style.transition = ""; }
+  }
+
+  function drawProg(now){
+    [["main", "Main"], ["fn", "Fn"]].forEach(function(p){
+      var box = $("slots" + p[1]); box.innerHTML = "";
+      var max = p[0] === "main" ? ch.m : ch.f;
+      for (var i = 0; i < max; i++){
+        var s = document.createElement("span"), cmd = prog[p[0]][i];
+        s.className = "slot " + (cmd ? "full " + cmd : "empty") + (now && now[0] === p[0] && now[1] === i ? " now" : "");
+        s.textContent = cmd ? ICON[cmd] : "";
+        if (cmd){ s.setAttribute("aria-label", NAME[cmd] + ". Toca per treure-ho."); s.dataset.i = i; }
+        box.appendChild(s);
+      }
+      $("lbl" + p[1]).textContent = p[0] === "main" ? "Programa (" + prog.main.length + " de " + ch.m + ")" : "Funció ★ (" + prog.fn.length + " de " + ch.f + ")";
+      $("line" + p[1]).classList.toggle("active", active === p[0]);
+    });
+  }
+
+  function drawPalette(){
+    var pal = $("palette"); pal.innerHTML = "";
+    ["F", "L", "R"].concat(ch.f ? ["P"] : []).forEach(function(c){
+      var b = document.createElement("button"); b.type = "button"; b.className = "blk " + c; b.textContent = ICON[c];
+      b.setAttribute("aria-label", "Afegeix: " + NAME[c]);
+      b.addEventListener("click", function(){
+        if (running || solved) return;
+        var max = active === "main" ? ch.m : ch.f;
+        if (prog[active].length >= max){ Taller.msg($("msg"), "Aquesta línia ja és plena. Treu un bloc tocant-lo" + (ch.f && active === "main" ? ", o fes servir la funció ★." : "."), "think"); return; }
+        prog[active].push(c); Taller.msg($("msg"), ""); drawProg();
+      });
+      pal.appendChild(b);
+    });
+  }
+
+  // Tocar una línia l'activa; tocar un bloc de la línia el treu
+  ["Main", "Fn"].forEach(function(n){
+    $("line" + n).addEventListener("click", function(e){
+      if (running || solved) return;
+      var key = n === "Main" ? "main" : "fn", t = e.target.closest(".slot");
+      if (t && t.dataset.i != null && active === key){ prog[key].splice(+t.dataset.i, 1); }
+      active = key; drawProg();
+    });
+  });
+
+  // Converteix el programa en una llista de passos (la funció es pot cridar a si mateixa: limitem els passos)
+  function steps(){
+    var out = [], LIMIT = 80;
+    function run(line, depth){
+      for (var i = 0; i < prog[line].length; i++){
+        if (out.length >= LIMIT) return;
+        var c = prog[line][i];
+        if (c === "P"){ out.push({ c:"P", at:[line, i] }); if (depth < 20) run("fn", depth + 1); }
+        else out.push({ c:c, at:[line, i] });
+      }
+    }
+    run("main", 0);
+    return out;
+  }
+
+  function execute(){
+    if (running || solved) return;
+    if (!prog.main.length){ Taller.msg($("msg"), "El programa és buit. Posa-hi blocs tocant els botons de sota.", "think"); return; }
+    var list = steps(), x = ch.s[0], y = ch.s[1], d = ch.s[2], k = 0, trail = {}, passed = false;
+    trail[x + "," + y] = 1;
+    running = true; Taller.msg($("msg"), ""); drawBoard(trail); place(x, y, d, true);
+    var delay = Taller.reducedMotion() ? 150 : 600;
+    function tick(){
+      if (k >= list.length){
+        running = false; drawProg();
+        if (x === ch.g[0] && y === ch.g[1]) return win();
+        if (list.length >= 80) Taller.msg($("msg"), "El robot no s'aturava mai: la funció es cridava a si mateixa. Canvia el programa i torna-ho a provar.", "think");
+        else Taller.msg($("msg"), passed ? "Has passat per l'estrella, però el robot s'hi ha de quedar a sobre en acabar. Canvia el programa i torna-ho a provar." : "El robot ha acabat el programa, però no és a l'estrella. Canvia el que calgui i torna-ho a provar.", "think");
+        return;
+      }
+      var s = list[k++]; drawProg(s.at);
+      if (s.c === "L") d = (d + 3) % 4;
+      else if (s.c === "R") d = (d + 1) % 4;
+      else if (s.c === "F"){
+        var nx = x + DIRS[d][0], ny = y + DIRS[d][1];
+        if (nx < 0 || ny < 0 || nx >= ch.n || ny >= ch.n || isRock(nx, ny)){
+          running = false;
+          Taller.msg($("msg"), "El robot s'ha aturat: al davant hi ha " + (isRock(nx, ny) ? "una pedra" : "la paret") + ". Canvia el programa i torna-ho a provar.", "think");
+          setTimeout(function(){ drawProg(); }, delay);
+          return;
+        }
+        x = nx; y = ny; trail[x + "," + y] = 1;
+        if (x === ch.g[0] && y === ch.g[1]) passed = true;
+        drawBoard(trail);
+      }
+      place(x, y, d);
+      setTimeout(tick, delay);
+    }
+    setTimeout(tick, 250);
+  }
+
+  function win(){
+    solved = true; Taller.markDone(GAME, "L" + li + "-" + ci); dots();
+    var last = ci === LEVELS[li].ch.length - 1, n = prog.main.length + prog.fn.length;
+    Taller.msg($("msg"), Taller.praise() + " El robot ha arribat a l'estrella amb un programa de " + n + " blocs." + (last ? " Has acabat el nivell!" : ""), "good");
+    $("btnNext").hidden = false; $("btnNext").textContent = last ? "Tria un altre nivell" : "Següent repte →"; $("btnRun").hidden = true;
+  }
+
+  $("btnRun").addEventListener("click", execute);
+  $("btnClear").addEventListener("click", function(){ if (running || solved) return; prog = { main:[], fn:[] }; active = "main"; Taller.msg($("msg"), ""); drawBoard(); place(ch.s[0], ch.s[1], ch.s[2], true); drawProg(); });
+  $("btnNext").addEventListener("click", function(){ if (ci < LEVELS[li].ch.length - 1){ ci++; start(); } else showLevels(); });
+  $("btnLevels").addEventListener("click", function(){ if (!running) showLevels(); });
+  addEventListener("resize", function(){ if (ch && !running) place(ch.s[0], ch.s[1], ch.s[2], true); });
+
+  window.__robot = { LEVELS:LEVELS };
+  showLevels();
+})();
+</script>
+</body>
+</html>

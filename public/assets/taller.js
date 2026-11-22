@@ -56,6 +56,26 @@
       el.setAttribute("aria-label", "Repte " + (current + 1) + " de " + total);
     },
 
+    // Targetes de nivell. levels: [{name, desc, ch:[...]}]; pick(nivell, primer repte no fet)
+    levelCards: function(box, game, levels, pick){
+      box.innerHTML = "";
+      levels.forEach(function(L, i){
+        var ids = L.ch.map(function(_, c){ return "L" + i + "-" + c; });
+        var n = Taller.countDone(game, ids);
+        var b = document.createElement("button"); b.type = "button"; b.className = "level";
+        b.innerHTML = '<span class="n">Nivell ' + (i + 1) + '</span><span class="t"></span><span class="d"></span><span class="done"></span>';
+        b.querySelector(".t").textContent = L.name;
+        b.querySelector(".d").textContent = L.desc;
+        b.querySelector(".done").textContent = L.free ? "Lliure" : (n === ids.length ? "Fet!" : (n ? n + " de " + ids.length + " reptes" : ids.length + " reptes"));
+        b.addEventListener("click", function(){
+          var first = 0;
+          for (var c = 0; c < ids.length; c++){ if (!Taller.done(game, ids[c])) { first = c; break; } }
+          pick(i, first);
+        });
+        box.appendChild(b);
+      });
+    },
+
     reducedMotion: function(){ return window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; }
   };
   window.Taller = Taller;
