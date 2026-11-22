@@ -16,13 +16,13 @@
 <link rel="stylesheet" href="../assets/taller.css">
 <style>
 /* Portada del taller: tres jocs com a targetes grans amb un dibuix senzill. */
-.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.game{display:flex;flex-direction:column;gap:8px;padding:20px;border-radius:var(--radius);background:var(--surface);
-  border:2px solid var(--rule-soft);color:inherit;text-decoration:none;min-height:250px}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.game{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:var(--radius);background:var(--surface);
+  border:2px solid var(--rule-soft);color:inherit;text-decoration:none;min-height:0}
 .game:hover{border-color:var(--accent)}
-.game svg{width:100%;max-width:220px;height:auto;align-self:center}
-.game .t{font-family:var(--font-display);font-size:1.35rem;font-weight:700}
-.game .d{color:var(--muted);font-size:17px}
+.game svg{width:100%;max-width:170px;height:auto;max-height:84px;align-self:center}
+.game .t{font-family:var(--font-display);font-size:1.2rem;font-weight:700}
+.game .d{color:var(--muted);font-size:15px;line-height:1.35}
 .game .p{margin-top:auto;color:var(--accent);font-weight:700;font-size:16px}
 .parents{font-size:15px;color:var(--muted)}
 .parents a{color:inherit}

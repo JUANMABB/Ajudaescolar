@@ -139,7 +139,7 @@
   }
 
   function drawBoard(trail){
-    var b = $("board"); b.innerHTML = ""; b.style.gridTemplateColumns = "repeat(" + ch.n + ",1fr)";
+    var b = $("board"); b.innerHTML = ""; b.style.gridTemplateColumns = "repeat(" + ch.n + ",minmax(0,1fr))"; b.style.gridTemplateRows = "repeat(" + ch.n + ",minmax(0,1fr))";
     trail = trail || {};
     for (var y = 0; y < ch.n; y++) for (var x = 0; x < ch.n; x++){
       var c = document.createElement("div"); c.className = "cell" + (trail[x + "," + y] ? " trail" : "");

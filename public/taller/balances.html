@@ -17,16 +17,16 @@
 <style>
 /* Una balança (o dues) al centre. Sota cada plat, els pesos que es poden posar.
    Tocar una peça d'un plat la treu. La resposta es diu amb el selector de nombre. */
-.scales{display:grid;gap:10px}
+.scales{display:grid;gap:10px;flex:1 1 auto;min-height:0}
 .scales.two{grid-template-columns:1fr 1fr}
 @media (max-width:760px){.scales.two{grid-template-columns:1fr}}
-.scaleBox{display:flex;flex-direction:column;gap:6px;min-width:0}
-.scaleBox svg{width:100%;height:auto;display:block;touch-action:manipulation}
+.scaleBox{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
+.scaleBox svg{width:100%;flex:1 1 auto;min-height:150px;height:100%;display:block;touch-action:manipulation}
 .scales:not(.two) .scaleBox{max-width:640px;width:100%;margin:0 auto}
 .palettes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.palette{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;padding:8px;border-radius:14px;background:var(--paper);border:2px dashed var(--rule-soft)}
+.palette{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;padding:6px;border-radius:14px;background:var(--paper);border:2px dashed var(--rule-soft)}
 .palette .lbl{width:100%;text-align:center;font-size:14px;color:var(--muted)}
-.wbtn{width:56px;height:56px;border-radius:50%;border:2px solid var(--warm);background:var(--warm-soft);font-family:var(--font-display);font-size:22px;font-weight:700}
+.wbtn{width:52px;height:52px;border-radius:50%;border:2px solid var(--warm);background:var(--warm-soft);font-family:var(--font-display);font-size:22px;font-weight:700}
 .state{text-align:center;font-size:16px;color:var(--muted);min-height:1.4em}
 .answers{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}
 .answer{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
@@ -215,7 +215,7 @@
     box.className = "scales" + (state.length > 1 ? " two" : "");
     state.forEach(function(sc, si){
       var wrap = document.createElement("div"); wrap.className = "scaleBox";
-      var svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 0 600 330");
+      var svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 0 600 330"); svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
       svg.setAttribute("role", "img");
       svg.innerHTML =
         '<rect x="250" y="300" width="100" height="16" rx="6" fill="var(--rule)"/>' +
