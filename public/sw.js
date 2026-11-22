@@ -1,14 +1,15 @@
 /* Ajudaescolar · trabajador de fondo (service worker)
    Guarda una copia de la web en el iPad para que funcione sin internet.
    - Páginas: primero intenta la versión nueva de internet; si no hay conexión, usa la copia guardada.
-   - Fuentes, iconos y estilos: usa la copia guardada (cambian muy poco).
+   - Estilos y código (CSS, JS): también primero internet, para que un cambio no deje páginas nuevas con código viejo.
+   - Fuentes e iconos: usa la copia guardada (no cambian).
    Al publicar cambios importantes, subir el número de VERSION para renovar la copia.
 
    Las páginas se guardan con su dirección "limpia" (sin .html), que es la que sirve Cloudflare.
    Nunca se guarda ni se entrega una respuesta que venga de una redirección: Safari la rechaza
    al abrir una página y la web dejaría de funcionar sin conexión. */
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const CACHE = "ajudaescolar-" + VERSION;
 const FILES = [
   "./",
@@ -75,14 +76,15 @@ self.addEventListener("fetch", (event) => {
   const key = cleanKey(req.url);
 
   const isPage = req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html");
-  if (isPage) {
+  const isCode = /\.(css|js|webmanifest)$/.test(new URL(req.url).pathname);
+  if (isPage || isCode) {
     event.respondWith((async () => {
       try {
         const res = await clean(await fetch(req));
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(key, copy)); }
         return res;
       } catch (e) {
-        return (await caches.match(key)) || (await caches.match(cleanKey("./"))) || Response.error();
+        return (await caches.match(key)) || (isPage ? await caches.match(cleanKey("./")) : null) || Response.error();
       }
     })());
     return;
