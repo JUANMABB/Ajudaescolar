@@ -9,7 +9,9 @@
 
   var Taller = {
     done: function(game, id){ var o = all(); return !!(o[game] && o[game][id]); },
-    markDone: function(game, id){ var o = all(); o[game] = o[game] || {}; o[game][id] = 1; store(o); },
+    // Guarda la data del primer cop que es fa (abans es guardava un 1: també compta com a fet)
+    markDone: function(game, id){ var o = all(); o[game] = o[game] || {}; if (!o[game][id]) { o[game][id] = new Date().toISOString(); store(o); } },
+    all: all,
     countDone: function(game, ids){ var n = 0; ids.forEach(function(id){ if (Taller.done(game, id)) n++; }); return n; },
 
     // Selector de número: devuelve {get, set}

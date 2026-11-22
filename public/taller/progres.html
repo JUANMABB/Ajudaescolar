@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#eef2f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Progreso del taller</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Taller">
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="stylesheet" href="../assets/base.css">
+<link rel="stylesheet" href="../assets/taller.css">
+<style>
+/* Página para los padres (en castellano): qué retos están hechos en cada juego, leído de este iPad. */
+body{font-size:17px}
+.summary{display:flex;flex-wrap:wrap;gap:12px}
+.summary div{background:var(--surface);border:2px solid var(--rule-soft);border-radius:14px;padding:12px 16px}
+.summary b{display:block;font-family:var(--font-display);font-size:1.6rem;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+th{font-size:14px;color:var(--muted);font-weight:700}
+td.n{white-space:nowrap}
+.game{background:var(--surface);border:2px solid var(--rule-soft);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:8px;overflow-x:auto}
+.bar{height:10px;border-radius:6px;background:var(--rule-soft);overflow:hidden;min-width:80px}
+.bar span{display:block;height:100%;background:var(--accent)}
+textarea{width:100%;min-height:160px;font:14px/1.4 ui-monospace,monospace;border-radius:12px;border:2px solid var(--rule);padding:10px;background:var(--paper);color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="volver" href="./">← Taller</a>
+    <h1>Progreso (para los padres)</h1>
+  </div>
+  <p class="muted">Lo que se ha completado en este iPad, desde este icono. Las fechas solo se guardan desde el 22/11/2026; lo anterior aparece como «antes».</p>
+  <div class="summary" id="summary"></div>
+  <div id="games" class="wrap" style="gap:14px"></div>
+  <h2>Resumen para copiar</h2>
+  <p class="muted">Pulsa «Copiar» y pégalo en el chat de Claude (o haz una captura de pantalla de esta página).</p>
+  <div class="row"><button class="btn primary" id="copy" type="button">Copiar el resumen</button><span id="copied" class="muted"></span></div>
+  <textarea id="txt" readonly aria-label="Resumen del progreso"></textarea>
+</div>
+<script src="../assets/taller.js"></script>
+<script>
+(function(){
+  // Catálogo: juego → niveles (nombre, número de retos, prefijo de id)
+  function L(names, counts){ return names.map(function(n, i){ return { name:n, ids:Array.from({ length:counts[i] }, function(_, c){ return "L" + i + "-" + c; }) }; }); }
+  var GAMES = [
+    { id:"balances", name:"Balances misterioses (álgebra)", levels:L(["Equilibra","La caixa misteriosa","Caixes iguals","Caixes als dos plats","Dues caixes diferents"], [5,4,4,4,4]) },
+    { id:"triangles", name:"Triangles i angles", levels:[
+      { name:"Reptes de construir", ids:["r0","r1","r2","r3","r4","r5","r6"] },
+      { name:"L'angle amagat (6 seguidos)", ids:["amagat"] },
+      { name:"Pitàgores", ids:["pitagores"] } ] },
+    { id:"cavall", name:"El cavall saltador (ajedrez)", levels:L(["Un salt","Dos salts","Tres salts","Pedres al camí","Recull estrelles"], [4,4,4,4,4]) },
+    { id:"mirall", name:"El mirall (simetrías)", levels:L(["Mirall vertical","Mirall horitzontal","Dos miralls","Mirall en diagonal"], [4,3,3,3]) },
+    { id:"rellotge", name:"Quina hora és?", levels:L(["En punt","Els quarts","Posa l'hora","Rellotge digital","Què passarà?"], [4,6,5,5,4]) },
+    { id:"fraccions", name:"Fraccions iguals", levels:L(["Meitats","Terços i quarts","Tria els trossos","Quina és més gran?"], [4,5,4,5]) },
+    { id:"robot", name:"El robot programador", levels:L(["Endavant i girs","Pedres al camí","La funció ★","Repte de mestre"], [4,3,4,2]) }
+  ];
+  var data = Taller.all();
+  function d(v){ if (typeof v !== "string") return null; var t = new Date(v); return isNaN(t) ? null : t; }
+  function fmt(t){ return t ? t.toLocaleDateString("es-ES", { day:"numeric", month:"short" }) + " " + t.toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" }) : "antes"; }
+
+  var total = 0, done = 0, dates = [], lines = ["Progreso del taller (" + new Date().toLocaleDateString("es-ES") + ")"];
+  var box = document.getElementById("games");
+  GAMES.forEach(function(g){
+    var gd = data[g.id] || {}, gTot = 0, gDone = 0, last = null;
+    var card = document.createElement("section"); card.className = "game";
+    var rows = "";
+    lines.push("", g.name + ":");
+    g.levels.forEach(function(lv){
+      var n = lv.ids.filter(function(id){ return gd[id]; }).length;
+      var lastLv = null; lv.ids.forEach(function(id){ var t = d(gd[id]); if (t){ dates.push(t); if (!lastLv || t > lastLv) lastLv = t; } });
+      if (lastLv && (!last || lastLv > last)) last = lastLv;
+      gTot += lv.ids.length; gDone += n;
+      rows += "<tr><td></td><td class='n'>" + n + " de " + lv.ids.length + "</td><td><div class='bar'><span style='width:" + (n / lv.ids.length * 100) + "%'></span></div></td><td class='n'>" + (n ? fmt(lastLv) : "") + "</td></tr>";
+      lines.push("  - " + lv.name + ": " + n + "/" + lv.ids.length + (n === lv.ids.length ? " (completo)" : "") + (lastLv ? " · último " + fmt(lastLv) : ""));
+    });
+    total += gTot; done += gDone;
+    card.innerHTML = "<h2></h2><p class='muted'></p><table><thead><tr><th>Nivel</th><th>Hechos</th><th></th><th>Último</th></tr></thead><tbody>" + rows + "</tbody></table>";
+    card.querySelector("h2").textContent = g.name;
+    card.querySelector("p").textContent = gDone + " de " + gTot + " retos" + (gDone === gTot ? " · ¡todo completo!" : "");
+    var tds = card.querySelectorAll("tbody tr td:first-child");
+    g.levels.forEach(function(lv, i){ tds[i].textContent = lv.name; });
+    box.appendChild(card);
+    lines[lines.indexOf(g.name + ":")] = g.name + ": " + gDone + "/" + gTot;
+  });
+  var first = dates.length ? new Date(Math.min.apply(null, dates)) : null;
+  var lastAll = dates.length ? new Date(Math.max.apply(null, dates)) : null;
+  document.getElementById("summary").innerHTML =
+    "<div><b>" + done + " / " + total + "</b>retos hechos</div>" +
+    "<div><b>" + Math.round(done / total * 100) + "%</b>del taller</div>" +
+    "<div><b>" + (lastAll ? fmt(lastAll) : "—") + "</b>último reto con fecha</div>";
+  lines.splice(1, 0, "Total: " + done + "/" + total + " retos (" + Math.round(done / total * 100) + "%)" + (first ? " · con fecha desde " + fmt(first) : ""));
+  var txt = document.getElementById("txt"); txt.value = lines.join("\n");
+  document.getElementById("copy").addEventListener("click", function(){
+    var ok = function(){ document.getElementById("copied").textContent = "Copiado"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt.value).then(ok, function(){ txt.select(); });
+    else { txt.select(); try { document.execCommand("copy"); ok(); } catch(e){} }
+  });
+})();
+</script>
+</body>
+</html>
