@@ -130,6 +130,7 @@
     $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name; dots();
     $("ask").textContent = "Porta el robot fins a l'estrella." + (ch.f ? " La línia principal només té " + ch.m + " llocs: fes servir la funció ★." : "");
     prog = { main:[], fn:[] }; active = "main"; running = false; solved = false;
+    Taller.begin(GAME, "L" + li + "-" + ci);
     $("lineFn").hidden = !ch.f;
     $("btnNext").hidden = true; $("btnRun").hidden = false;
     Taller.msg($("msg"), "");
@@ -228,6 +229,7 @@
       if (k >= list.length){
         running = false; drawProg();
         if (x === ch.g[0] && y === ch.g[1]) return win();
+        Taller.tried();
         if (list.length >= 80) Taller.msg($("msg"), "El robot no s'aturava mai: la funció es cridava a si mateixa. Canvia el programa i torna-ho a provar.", "think");
         else Taller.msg($("msg"), passed ? "Has passat per l'estrella, però el robot s'hi ha de quedar a sobre en acabar. Canvia el programa i torna-ho a provar." : "El robot ha acabat el programa, però no és a l'estrella. Canvia el que calgui i torna-ho a provar.", "think");
         return;
@@ -238,7 +240,7 @@
       else if (s.c === "F"){
         var nx = x + DIRS[d][0], ny = y + DIRS[d][1];
         if (nx < 0 || ny < 0 || nx >= ch.n || ny >= ch.n || isRock(nx, ny)){
-          running = false;
+          running = false; Taller.tried();
           Taller.msg($("msg"), "El robot s'ha aturat: al davant hi ha " + (isRock(nx, ny) ? "una pedra" : "la paret") + ". Canvia el programa i torna-ho a provar.", "think");
           setTimeout(function(){ drawProg(); }, delay);
           return;
@@ -254,8 +256,9 @@
   }
 
   function win(){
-    solved = true; Taller.markDone(GAME, "L" + li + "-" + ci); dots();
-    var last = ci === LEVELS[li].ch.length - 1, n = prog.main.length + prog.fn.length;
+    var n = prog.main.length + prog.fn.length;
+    solved = true; Taller.markDone(GAME, "L" + li + "-" + ci, { blocks:n }); dots();
+    var last = ci === LEVELS[li].ch.length - 1;
     Taller.msg($("msg"), Taller.praise() + " El robot ha arribat a l'estrella amb un programa de " + n + " blocs." + (last ? " Has acabat el nivell!" : ""), "good");
     $("btnNext").hidden = false; $("btnNext").textContent = last ? "Tria un altre nivell" : "Següent repte →"; $("btnRun").hidden = true;
   }

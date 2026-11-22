@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#eef2f1">
+<title>Evolución del taller</title>
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="stylesheet" href="../assets/base.css">
+<link rel="stylesheet" href="../assets/taller.css">
+<style>
+/* Panel para los padres: resumen arriba, después actividad por días, por juego y los retos que más han costado. */
+body{font-size:17px;-webkit-user-select:text;user-select:text}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.summary div{background:var(--surface);border:2px solid var(--rule-soft);border-radius:14px;padding:12px 16px}
+.summary b{display:block;font-family:var(--font-display);font-size:1.6rem;font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:2px solid var(--rule-soft);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:16px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+th{font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+td.wrap{white-space:normal}
+input[type=text],input[type=password]{font:inherit;padding:10px 12px;border-radius:12px;border:2px solid var(--rule);background:var(--paper);color:var(--fg);min-width:0;width:100%;max-width:420px}
+textarea{width:100%;min-height:180px;font:14px/1.4 ui-monospace,monospace;border-radius:12px;border:2px solid var(--rule);padding:10px;background:var(--paper);color:var(--fg)}
+.key{font:18px ui-monospace,monospace;background:var(--paper);border:2px dashed var(--accent);border-radius:12px;padding:10px 14px;word-break:break-all}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:13px;font-weight:700}
+.pill.done{background:var(--accent-soft);color:var(--accent)} .pill.abandon{background:var(--warm-soft);color:var(--warm)} .pill.round{background:var(--sky-soft);color:var(--sky)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Evolución del taller</h1></div>
+  <p class="muted">Lo que el iPad registra en silencio mientras juega: qué retos hace, cuántos intentos le cuestan, si pide pistas y cuánto tarda. No se guarda su nombre ni ningún dato personal.</p>
+
+  <section id="login" class="card" hidden>
+    <h2>Clave de acceso</h2>
+    <p id="loginText"></p>
+    <div class="row"><input type="password" id="keyIn" autocomplete="current-password" placeholder="Pega aquí la clave" aria-label="Clave"><button class="btn primary" id="btnUse" type="button">Entrar</button></div>
+    <div class="row"><button class="btn soft" id="btnCreate" type="button">Es la primera vez: crear la clave</button></div>
+    <div id="newKey" hidden>
+      <p><b>Guarda esta clave</b> en un lugar seguro (por ejemplo, en tus contraseñas). Sin ella no se puede ver el registro, y solo se puede crear una vez.</p>
+      <p class="key" id="keyOut"></p>
+    </div>
+    <div class="msg" id="loginMsg" role="status"></div>
+  </section>
+
+  <section id="panel" class="wrap" style="gap:16px" hidden>
+    <div class="summary" id="summary"></div>
+    <div class="card"><h2>Actividad por días</h2><div class="scroll" id="days"></div></div>
+    <div class="card"><h2>Por juego</h2><div class="scroll" id="games"></div></div>
+    <div class="card"><h2>Lo que más le ha costado</h2><p class="muted">Retos con más intentos, pistas o que dejó a medias.</p><div class="scroll" id="hard"></div></div>
+    <div class="card"><h2>Últimos movimientos</h2><div class="scroll" id="recent"></div></div>
+    <div class="card">
+      <h2>Para analizarlo con Claude</h2>
+      <p class="muted">Copia el resumen y pégalo en el chat del proyecto.</p>
+      <div class="row"><button class="btn primary" id="btnCopy" type="button">Copiar el resumen</button><button class="btn" id="btnCsv" type="button">Descargar todos los datos (CSV)</button><span class="muted" id="copied"></span></div>
+      <textarea id="txt" readonly aria-label="Resumen"></textarea>
+    </div>
+    <div class="row"><button class="btn" id="btnReload" type="button">Actualizar</button><button class="btn" id="btnLogout" type="button">Olvidar la clave en este dispositivo</button></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var KK = "pares-clau";
+  var GAMES = { balances:"Balances misterioses", triangles:"Triangles i angles", cavall:"El cavall saltador", mirall:"El mirall", rellotge:"Quina hora és?", fraccions:"Fraccions iguals", robot:"El robot programador" };
+  var LEVELS = {
+    balances:["Equilibra","La caixa misteriosa","Caixes iguals","Caixes als dos plats","Dues caixes diferents"],
+    cavall:["Un salt","Dos salts","Tres salts","Pedres al camí","Recull estrelles"],
+    mirall:["Mirall vertical","Mirall horitzontal","Dos miralls","Mirall en diagonal"],
+    rellotge:["En punt","Els quarts","Posa l'hora","Rellotge digital","Què passarà?"],
+    fraccions:["Meitats","Terços i quarts","Tria els trossos","Quina és més gran?"],
+    robot:["Endavant i girs","Pedres al camí","La funció ★","Repte de mestre"]
+  };
+  function chName(g, ch){
+    var m = /^L(\d+)-(\d+)$/.exec(ch);
+    if (m && LEVELS[g]) return (LEVELS[g][+m[1]] || "Nivel " + (+m[1] + 1)) + " · reto " + (+m[2] + 1);
+    if (g === "triangles"){ if (ch === "amagat") return "L'angle amagat"; if (ch === "pitagores") return "Pitàgores"; m = /^r(\d+)$/.exec(ch); if (m) return "Reptes de construir · reto " + (+m[1] + 1); }
+    return ch;
+  }
+  function getKey(){ try { return localStorage.getItem(KK) || ""; } catch(e){ return ""; } }
+  function setKey(k){ try { if (k) localStorage.setItem(KK, k); else localStorage.removeItem(KK); } catch(e){} }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); }
+  function mins(ms){ return Math.round(ms / 60000); }
+  function secs(ms){ var s = Math.round(ms / 1000); return s < 60 ? s + " s" : Math.floor(s / 60) + " min " + (s % 60 ? (s % 60) + " s" : ""); }
+  function day(ts){ return new Date(ts).toLocaleDateString("es-ES", { weekday:"short", day:"numeric", month:"short" }); }
+  function isPrev(e){ return !!(e.extra && e.extra.indexOf("anterior") >= 0); }
+  function median(a){ if (!a.length) return 0; a = a.slice().sort(function(x, y){ return x - y; }); var m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+
+  function showLogin(text){
+    $("panel").hidden = true; $("login").hidden = false;
+    $("loginText").textContent = text || "Escribe la clave para ver el registro.";
+  }
+
+  async function load(){
+    var k = getKey();
+    if (!k) return showLogin();
+    var r;
+    try { r = await fetch("/api/events", { headers:{ "x-clave":k }, cache:"no-store" }); }
+    catch(e){ return showLogin("No hay conexión. Inténtalo de nuevo cuando haya internet."); }
+    if (r.status === 404) return showLogin("Todavía no se ha creado la clave. Si es la primera vez, pulsa «crear la clave».");
+    if (r.status === 403){ setKey(""); return showLogin("Esa clave no es correcta."); }
+    var data = await r.json();
+    render(data.events || []);
+  }
+
+  function render(ev){
+    $("login").hidden = true; $("panel").hidden = false;
+    var done = ev.filter(function(e){ return e.type === "done"; });
+    var work = ev.filter(function(e){ return e.type !== "abandon" || e.ms < 3600000; });
+    var totalMs = work.reduce(function(s, e){ return s + Math.min(e.ms || 0, 20 * 60000); }, 0);
+    var daysMap = {};
+    ev.forEach(function(e){
+      var d = e.ts.slice(0, 10), o = daysMap[d] = daysMap[d] || { ts:e.ts, done:0, ms:0, tries:0, hints:0, abandon:0, games:{} };
+      if (e.type === "done") o.done++;
+      if (e.type === "abandon") o.abandon++;
+      o.ms += Math.min(e.ms || 0, 20 * 60000); o.tries += e.tries || 0; o.hints += e.hints || 0; o.games[e.game] = 1;
+    });
+    var days = Object.keys(daysMap).sort().reverse();
+    var first = done.length ? done[0].ts : null, last = ev.length ? ev[ev.length - 1].ts : null;
+    var measured = done.filter(function(e){ return !isPrev(e); });
+    var clean = measured.filter(function(e){ return !e.tries && !e.hints; }).length;
+    var cleanPct = measured.length ? Math.round(clean / measured.length * 100) + "%" : "—";
+    $("summary").innerHTML =
+      "<div><b>" + done.length + "</b>retos completados</div>" +
+      "<div><b>" + days.length + "</b>días de juego</div>" +
+      "<div><b>" + mins(totalMs) + " min</b>de juego en total</div>" +
+      "<div><b>" + cleanPct + "</b>a la primera y sin pistas</div>" +
+      "<div><b>" + (last ? day(last) : "—") + "</b>última vez</div>";
+
+    $("days").innerHTML = days.length ? "<table><thead><tr><th>Día</th><th>Retos</th><th>Minutos</th><th>Intentos fallidos</th><th>Pistas</th><th>Dejados a medias</th><th>Juegos</th></tr></thead><tbody>" +
+      days.map(function(d){ var o = daysMap[d]; return "<tr><td>" + day(o.ts) + "</td><td>" + o.done + "</td><td>" + mins(o.ms) + "</td><td>" + o.tries + "</td><td>" + o.hints + "</td><td>" + o.abandon + "</td><td class='wrap'>" + Object.keys(o.games).map(function(g){ return esc(GAMES[g] || g); }).join(", ") + "</td></tr>"; }).join("") +
+      "</tbody></table>" : "<p class='muted'>Todavía no hay nada registrado. En cuanto juegue con conexión, aparecerá aquí.</p>";
+
+    var per = {};
+    ev.forEach(function(e){
+      var o = per[e.game] = per[e.game] || { done:0, tries:[], hints:0, ms:[], abandon:0, clean:0 };
+      if (e.type === "done" && isPrev(e)) o.done++;
+      else if (e.type === "done"){ o.done++; o.meas = (o.meas || 0) + 1; o.tries.push(e.tries || 0); o.ms.push(e.ms || 0); if (!e.tries && !e.hints) o.clean++; }
+      if (e.type === "abandon") o.abandon++;
+      o.hints += e.hints || 0;
+    });
+    var gk = Object.keys(per);
+    $("games").innerHTML = gk.length ? "<table><thead><tr><th>Juego</th><th>Completados</th><th>A la primera</th><th>Intentos medios</th><th>Pistas</th><th>Tiempo típico</th><th>A medias</th></tr></thead><tbody>" +
+      gk.map(function(g){ var o = per[g], avg = o.tries.length ? (o.tries.reduce(function(a, b){ return a + b; }, 0) / o.tries.length) : 0;
+        return "<tr><td>" + esc(GAMES[g] || g) + "</td><td>" + o.done + "</td><td>" + (o.meas ? Math.round(o.clean / o.meas * 100) + "%" : "—") + "</td><td>" + avg.toFixed(1) + "</td><td>" + o.hints + "</td><td>" + (o.ms.length ? secs(median(o.ms)) : "—") + "</td><td>" + o.abandon + "</td></tr>"; }).join("") +
+      "</tbody></table>" : "<p class='muted'>Sin datos todavía.</p>";
+
+    var hard = ev.filter(function(e){ return e.type === "abandon" || (e.tries || 0) >= 2 || (e.hints || 0) >= 1; })
+      .sort(function(a, b){ return ((b.tries || 0) + 2 * (b.hints || 0) + (b.type === "abandon" ? 3 : 0)) - ((a.tries || 0) + 2 * (a.hints || 0) + (a.type === "abandon" ? 3 : 0)); }).slice(0, 12);
+    $("hard").innerHTML = hard.length ? "<table><thead><tr><th>Juego</th><th>Reto</th><th>Resultado</th><th>Intentos fallidos</th><th>Pistas</th><th>Tiempo</th><th>Día</th></tr></thead><tbody>" +
+      hard.map(rowHtml).join("") + "</tbody></table>" : "<p class='muted'>Nada le ha costado especialmente, de momento.</p>";
+
+    $("recent").innerHTML = ev.length ? "<table><thead><tr><th>Juego</th><th>Reto</th><th>Resultado</th><th>Intentos fallidos</th><th>Pistas</th><th>Tiempo</th><th>Día</th></tr></thead><tbody>" +
+      ev.slice(-30).reverse().map(rowHtml).join("") + "</tbody></table>" : "";
+
+    // Resumen de texto para Claude
+    var L = ["Registro del taller · " + new Date().toLocaleDateString("es-ES"),
+      "Retos completados: " + done.length + " · días: " + days.length + " · minutos: " + mins(totalMs) + " · a la primera y sin pistas: " + cleanPct + " (sin contar lo hecho antes de existir el registro)" + (first ? " · desde " + day(first) : ""), "", "Por día:"];
+    days.forEach(function(d){ var o = daysMap[d]; L.push("- " + d + ": " + o.done + " retos, " + mins(o.ms) + " min, " + o.tries + " fallos, " + o.hints + " pistas, " + o.abandon + " a medias"); });
+    L.push("", "Por juego:");
+    gk.forEach(function(g){ var o = per[g], avg = o.tries.length ? (o.tries.reduce(function(a, b){ return a + b; }, 0) / o.tries.length) : 0;
+      L.push("- " + (GAMES[g] || g) + ": " + o.done + " completados, " + (o.meas ? Math.round(o.clean / o.meas * 100) + "%" : "—") + " a la primera, " + avg.toFixed(1) + " fallos de media, " + o.hints + " pistas, tiempo típico " + (o.ms.length ? secs(median(o.ms)) : "—") + ", " + o.abandon + " a medias"); });
+    L.push("", "Todos los retos (orden cronológico):");
+    ev.forEach(function(e){ L.push("- " + e.ts.slice(0, 16).replace("T", " ") + " · " + (GAMES[e.game] || e.game) + " · " + chName(e.game, e.ch) + " · " + e.type + " · fallos " + (e.tries || 0) + " · pistas " + (e.hints || 0) + " · " + secs(e.ms || 0) + (e.extra ? " · " + e.extra : "")); });
+    $("txt").value = L.join("\n");
+    window.__events = ev;
+  }
+
+  function rowHtml(e){
+    var lab = isPrev(e) ? "hecho antes" : e.type === "done" ? "hecho" : (e.type === "abandon" ? "a medias" : "ronda");
+    return "<tr><td>" + esc(GAMES[e.game] || e.game) + "</td><td>" + esc(chName(e.game, e.ch)) + "</td><td><span class='pill " + e.type + "'>" + lab + "</span></td><td>" + (e.tries || 0) + "</td><td>" + (e.hints || 0) + "</td><td>" + secs(e.ms || 0) + "</td><td>" + day(e.ts) + "</td></tr>";
+  }
+
+  $("btnUse").addEventListener("click", function(){ var k = $("keyIn").value.trim(); if (k){ setKey(k); load(); } });
+  $("btnCreate").addEventListener("click", async function(){
+    var k = Array.from(crypto.getRandomValues(new Uint8Array(15)), function(b){ return "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]; }).join("").replace(/(.{5})(?!$)/g, "$1-");
+    var r;
+    try { r = await fetch("/api/claim", { method:"POST", headers:{ "content-type":"application/json" }, body:JSON.stringify({ key:k }) }); }
+    catch(e){ $("loginMsg").textContent = "No hay conexión."; return; }
+    if (r.status === 409){ $("loginMsg").className = "msg think"; $("loginMsg").textContent = "La clave ya se creó antes. Usa la que guardaste."; return; }
+    if (!r.ok){ $("loginMsg").textContent = "No se ha podido crear. Inténtalo más tarde."; return; }
+    setKey(k); $("keyOut").textContent = k; $("newKey").hidden = false; $("btnCreate").disabled = true;
+    $("loginMsg").className = "msg good"; $("loginMsg").textContent = "Clave creada y guardada en este dispositivo. Cópiala antes de seguir.";
+    var go = document.createElement("button"); go.type = "button"; go.className = "btn primary"; go.textContent = "Ya la he guardado: ver el registro";
+    go.addEventListener("click", load); $("newKey").appendChild(go);
+  });
+  $("btnCopy").addEventListener("click", function(){
+    var t = $("txt"), ok = function(){ $("copied").textContent = "Copiado"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(ok, function(){ t.select(); }); else { t.select(); }
+  });
+  $("btnCsv").addEventListener("click", function(){
+    var ev = window.__events || [], head = ["fecha","juego","reto","tipo","fallos","pistas","segundos","extra"];
+    var rows = ev.map(function(e){ return [e.ts, GAMES[e.game] || e.game, chName(e.game, e.ch), e.type, e.tries || 0, e.hints || 0, Math.round((e.ms || 0) / 1000), e.extra || ""].map(function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; }).join(","); });
+    var blob = new Blob([[head.join(",")].concat(rows).join("\n")], { type:"text/csv" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "taller-registro.csv"; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $("btnReload").addEventListener("click", load);
+  $("btnLogout").addEventListener("click", function(){ setKey(""); showLogin(); });
+  load();
+})();
+</script>
+</body>
+</html>

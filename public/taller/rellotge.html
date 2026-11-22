@@ -144,6 +144,7 @@
   function start(){
     $("levelsView").hidden = true; $("playView").hidden = false;
     var L = LEVELS[li]; solved = false; setMode = false;
+    Taller.begin(GAME, "L" + li + "-" + ci);
     $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name; dots();
     var side = $("side"); side.innerHTML = "";
     var ask = document.createElement("p"); ask.className = "ask"; side.appendChild(ask);
@@ -180,7 +181,7 @@
         var b = button(o, "opt", function(){
           if (solved) return;
           if (o === right){ b.classList.add("good"); win(L.mode === "digital" ? "" : ""); if (L.mode === "digital"){ svg.style.visibility = "visible"; } }
-          else { b.classList.add("tried"); Taller.msg(msgEl, L.mode === "digital" ? "No és aquesta. Pensa on seria l'agulla llarga: als minuts :15 és un quart, als :30 dos quarts i als :45 tres quarts. I amb els quarts es diu l'hora que ve." : hintFor(t, true), "think"); }
+          else { Taller.tried(); b.classList.add("tried"); Taller.msg(msgEl, L.mode === "digital" ? "No és aquesta. Pensa on seria l'agulla llarga: als minuts :15 és un quart, als :30 dos quarts i als :45 tres quarts. I amb els quarts es diu l'hora que ve." : hintFor(t, true), "think"); }
         });
         box.appendChild(b);
       });
@@ -205,7 +206,7 @@
       btns.appendChild(button("Comprova", "btn primary", function(){
         if (solved) return;
         if (((t - target) % 720 + 720) % 720 === 0) win("El rellotge marca " + digital(t) + ".");
-        else Taller.msg(msgEl, "Encara no. Ara el rellotge diu: «" + frase(t) + "». " + hintFor(target), "think");
+        else { Taller.tried(); } if (!solved) Taller.msg(msgEl, "Encara no. Ara el rellotge diu: «" + frase(t) + "». " + hintFor(target), "think");
       }));
     }
     btns.appendChild(next); btns.appendChild(back);

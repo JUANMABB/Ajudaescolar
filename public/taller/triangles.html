@@ -251,6 +251,7 @@
     function run(){
       st.innerHTML = "";
       var R = REPTES[k], solved = false;
+      Taller.begin(GAME, "r" + k);
       Taller.dots($("dots"), REPTES.length, k, function(i){ return Taller.done(GAME, "r" + i); });
       st.insertAdjacentHTML("beforeend", '<p class="ask"></p>'); st.querySelector(".ask").textContent = R.text;
       var holder = document.createElement("div"); st.appendChild(holder);
@@ -283,6 +284,7 @@
   // ---------- 3. L'angle amagat ----------
   function amagat(st){
     var ROUNDS = 6, k = 0, doneSet = {};
+    Taller.begin(GAME, "amagat");
     function makeAngles(){
       var a, b, c;
       do { a = 25 + 5 * Math.floor(Math.random() * 20); b = 25 + 5 * Math.floor(Math.random() * 20); c = 180 - a - b; } while (c < 25);
@@ -337,16 +339,16 @@
         if (solved) return;
         var g = stp.get(), tot = known[0] + known[1] + g;
         if (g === hiddenVal){
-          solved = true; doneSet[k] = 1; drawMarks(true);
+          solved = true; doneSet[k] = 1; drawMarks(true); Taller.round({ k:k, angle:hiddenVal });
           Taller.msg(msg, Taller.praise() + " " + known[0] + " + " + known[1] + " + " + g + " = 180°.", "good");
           chk.hidden = true; hint.hidden = true; next.hidden = false;
           Taller.dots($("dots"), ROUNDS, k, function(i){ return !!doneSet[i]; });
           if (Object.keys(doneSet).length >= ROUNDS) Taller.markDone(GAME, "amagat");
         } else {
-          Taller.msg(msg, "Amb el teu nombre, els tres angles sumen " + tot + "°. Han de fer 180°. Torna-ho a provar.", "think");
+          Taller.tried(); Taller.msg(msg, "Amb el teu nombre, els tres angles sumen " + tot + "°. Han de fer 180°. Torna-ho a provar.", "think");
         }
       });
-      hint.addEventListener("click", function(){ Taller.msg(msg, "Pista: els tres angles d'un triangle sempre sumen 180°. Quant sumen els dos que ja saps?", "think"); });
+      hint.addEventListener("click", function(){ Taller.hinted(); Taller.msg(msg, "Pista: els tres angles d'un triangle sempre sumen 180°. Quant sumen els dos que ja saps?", "think"); });
       next.addEventListener("click", function(){ if (k < ROUNDS - 1) k++; else { k = 0; doneSet = {}; } run(); });
       btns.appendChild(chk); btns.appendChild(hint); btns.appendChild(next);
     }
@@ -356,6 +358,7 @@
   // ---------- 4. Pitàgores ----------
   function pitagores(st){
     var a = 3, b = 4, arr = 1, anim = null, solved = false;
+    Taller.begin(GAME, "pitagores");
     st.innerHTML =
       '<div class="pyth"><div id="pic"></div><div class="side">' +
       '<p class="ask">Quatre triangles iguals dins d\'un marc quadrat. Els pots moure.</p>' +
@@ -427,10 +430,10 @@
     st.querySelector("#chk").addEventListener("click", function(){
       var right = a * a + b * b, g = sq.get();
       if (g === right){
-        solved = true; Taller.markDone(GAME, "pitagores");
+        solved = true; Taller.markDone(GAME, "pitagores", { a:a, b:b });
         Taller.msg(msg, Taller.praise() + " " + a + "×" + a + " + " + b + "×" + b + " = " + (a * a) + " + " + (b * b) + " = " + right + ". I com que l'espai lliure és el mateix en les dues posicions, el quadrat inclinat també té " + right + " quadrets. Això és el teorema de Pitàgores! Prova-ho amb altres costats.", "good");
       } else {
-        Taller.msg(msg, arr === 1 ? "Encara no. Costa comptar el quadrat inclinat… Mou els triangles: amb dos quadrats rectes és més fàcil." : "Encara no. Compta els quadrets de cada quadrat blau i suma'ls.", "think");
+        Taller.tried(); Taller.msg(msg, arr === 1 ? "Encara no. Costa comptar el quadrat inclinat… Mou els triangles: amb dos quadrats rectes és més fàcil." : "Encara no. Compta els quadrets de cada quadrat blau i suma'ls.", "think");
       }
     });
     draw(0);

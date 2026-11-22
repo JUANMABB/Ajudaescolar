@@ -176,6 +176,7 @@
     Taller.dots($("dots"), L.ch.length, ci, function(i){ return Taller.done(GAME, cid(li, i)); });
     $("ask").textContent = ch.text;
     state = clone(ch.scales); hintN = 0; solved = false;
+    Taller.begin(GAME, cid(li, ci));
     Taller.msg($("msg"), "");
     $("btnNext").hidden = true; $("btnHint").disabled = false; $("btnReset").disabled = false;
     $("btnCheck").hidden = !ch.ask;
@@ -364,6 +365,7 @@
     var guess = {}, ok = true;
     ch.ask.forEach(function(k){ guess[k] = answerSteppers[k].get(); if (guess[k] !== ch.vals[k]) ok = false; });
     if (ok) return success();
+    Taller.tried();
     // Explicar per què no quadra, sense donar la solució
     var only = ch.ask.length === 1;
     var useScales = state.every(function(s){ return balanced(s, ch.vals); }) ? state : (ch.scales.every(function(s){ return balanced(s, ch.vals); }) ? ch.scales : null);
@@ -389,7 +391,7 @@
     var h = ch.hints || [];
     if (!h.length) return;
     Taller.msg($("msg"), "Pista: " + h[Math.min(hintN, h.length - 1)], "think");
-    hintN++;
+    hintN++; Taller.hinted();
   });
   $("btnReset").addEventListener("click", function(){ if (!solved){ state = clone(ch.scales); buildScales(); Taller.msg($("msg"), ""); } });
   $("btnNext").addEventListener("click", function(){

@@ -9,7 +9,7 @@
    Nunca se guarda ni se entrega una respuesta que venga de una redirección: Safari la rechaza
    al abrir una página y la web dejaría de funcionar sin conexión. */
 
-const VERSION = "0.3.3";
+const VERSION = "0.4.0";
 const CACHE = "ajudaescolar-" + VERSION;
 const FILES = [
   "./",
@@ -75,6 +75,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  if (new URL(req.url).pathname.startsWith("/api/")) return;   // el registro siempre va a internet
   const key = cleanKey(req.url);
 
   const isPage = req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html");

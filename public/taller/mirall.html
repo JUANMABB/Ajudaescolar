@@ -130,6 +130,7 @@
     if (L.free) $("dots").innerHTML = ""; else Taller.dots($("dots"), L.ch.length, ci, function(i){ return Taller.done(GAME, "L" + li + "-" + i); });
     $("ask").textContent = L.free ? "Toca els quadrets de dalt a l'esquerra. Els miralls pintaran la resta." : AX[ch.ax].text;
     given = {}; target = {}; mine = {}; solved = false; hintOn = false;
+    if (!L.free) Taller.begin(GAME, "L" + li + "-" + ci);
     var A = AX[ch.ax];
     ch.p.forEach(function(c){
       if (!A.src(c)) return;
@@ -200,6 +201,7 @@
       Taller.dots($("dots"), LEVELS[li].ch.length, ci, function(i){ return Taller.done(GAME, "L" + li + "-" + i); });
       draw(); return;
     }
+    Taller.tried();
     var parts = [];
     if (miss) parts.push(miss === 1 ? "falta 1 quadret" : "falten " + miss + " quadrets");
     if (extra) parts.push(extra === 1 ? "n'hi ha 1 que no va" : "n'hi ha " + extra + " que no van");
@@ -209,7 +211,7 @@
   $("btnCheck").addEventListener("click", check);
   $("btnHint").addEventListener("click", function(){
     if (solved) return;
-    hintOn = true; draw();
+    hintOn = true; Taller.hinted(); draw();
     Taller.msg($("msg"), "Pista: el contorn blau marca on falta pintar i el taronja clar, el que sobra. Compta quants quadrets hi ha fins al mirall a cada banda.", "think");
   });
   $("btnClear").addEventListener("click", function(){ if (!solved){ mine = {}; hintOn = false; Taller.msg($("msg"), ""); draw(); } });

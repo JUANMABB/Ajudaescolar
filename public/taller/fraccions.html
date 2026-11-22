@@ -93,6 +93,7 @@
   function start(){
     $("levelsView").hidden = true; $("playView").hidden = false;
     var L = LEVELS[li], c = L.ch[ci], st = $("stage"), solved = false;
+    Taller.begin(GAME, "L" + li + "-" + ci);
     $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name; dots();
     st.innerHTML = "";
     var ask = el("p", "ask"); st.appendChild(ask);
@@ -139,6 +140,7 @@
         var n2 = count();
         if (L.mode === "choose" && d2 === d1){ Taller.msg(msg, "Així la barra queda partida igual que la de dalt. Prova amb un altre nombre de trossos!", "think"); return; }
         if (n2 * d1 === n1 * d2){ win(n1 + "/" + d1 + " i " + n2 + "/" + d2 + " són la mateixa quantitat de xocolata."); return; }
+        Taller.tried();
         if (L.mode === "choose" && (n1 * d2) % d1 !== 0){ Taller.msg(msg, "Amb " + d2 + " trossos no es pot fer exacte: sempre sobra o falta un bocí. Prova amb un altre nombre de trossos.", "think"); return; }
         Taller.msg(msg, n2 * d1 < n1 * d2 ? "Encara és menys que a dalt. Mira fins on arriba el color blau." : "És més que a dalt. Mira fins on arriba el color blau.", "think");
       });
@@ -156,7 +158,7 @@
           if (solved) return;
           var want = cmp > 0 ? 1 : (cmp < 0 ? -1 : 0);
           if (o[1] === want){ win(cmp === 0 ? A[0] + "/" + A[1] + " i " + B[0] + "/" + B[1] + " són iguals." : (cmp > 0 ? A[0] + "/" + A[1] : B[0] + "/" + B[1]) + " és més gran."); }
-          else { b.disabled = true; Taller.msg(msg, "Mira bé on acaba el color de cada barra. Les dues barres són igual de llargues.", "think"); }
+          else { Taller.tried(); b.disabled = true; Taller.msg(msg, "Mira bé on acaba el color de cada barra. Les dues barres són igual de llargues.", "think"); }
         });
         ch.appendChild(b);
       });

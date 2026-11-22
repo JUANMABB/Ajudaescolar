@@ -161,6 +161,7 @@
   function start(){
     $("levelsView").hidden = true; $("playView").hidden = false;
     var L = LEVELS[li]; ch = L.ch[ci]; ch.min = ch.min || minJumps(ch);
+    Taller.begin(GAME, cid(li, ci));
     $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name;
     Taller.dots($("dots"), L.ch.length, ci, function(i){ return Taller.done(GAME, cid(li, i)); });
     $("ask").textContent = ch.stars.length > 1
@@ -207,7 +208,7 @@
     if (p[0] === pos[0] && p[1] === pos[1]) return;
     if (isRock(p)){ Taller.msg($("msg"), "Aquí hi ha una pedra. El cavall pot saltar per sobre de les pedres, però no hi pot caure.", "think"); return; }
     var ok = jumps(pos).some(function(q){ return q[0] === p[0] && q[1] === p[1]; });
-    if (!ok){ Taller.msg($("msg"), "Des d'aquí el cavall no hi arriba. Salta en forma de L: dues caselles cap a un costat i una cap a l'altre.", "think"); return; }
+    if (!ok){ Taller.tried(); Taller.msg($("msg"), "Des d'aquí el cavall no hi arriba. Salta en forma de L: dues caselles cap a un costat i una cap a l'altre.", "think"); return; }
     pos = p.slice(); path.push(pos.slice()); collect();
     Taller.msg($("msg"), "");
     if (ch.stars.every(function(s){ return got[key(s)]; })) win();
@@ -217,7 +218,7 @@
   function win(){
     finished = true;
     var n = path.length - 1, last = ci === LEVELS[li].ch.length - 1;
-    Taller.markDone(GAME, cid(li, ci));
+    Taller.markDone(GAME, cid(li, ci), { jumps:n, min:ch.min });
     if (n === ch.min) Taller.msg($("msg"), Taller.praise() + " " + n + (n === 1 ? " salt" : " salts") + ": el camí més curt!" + (last ? " Has acabat el nivell!" : ""), "good");
     else Taller.msg($("msg"), "Ho has aconseguit en " + n + " salts! Es pot fer en " + ch.min + ". Si vols, torna a començar i busca un camí més curt.", "good");
     $("btnNext").hidden = false; $("btnNext").textContent = last ? "Tria un altre nivell" : "Següent repte →";
