@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#eef2f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Fraccions iguals</title>
+<title>Fraccions</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Taller">
 <link rel="apple-touch-icon" href="../assets/icons/icon-180.png">
@@ -27,17 +27,25 @@
 .frac span:first-child{border-bottom:3px solid currentColor;padding:0 6px}
 .frac.upper{color:var(--sky)} .frac.lower{color:var(--warm)}
 .choices{display:flex;flex-wrap:wrap;gap:10px}
+.bar.result .part.on{background:var(--plum)}
+.bar.result .part.ua{background:var(--sky)}
+.bar.result .part.lb{background:var(--warm)}
+.bar.whole .part{background:var(--accent)}
+.lab{display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:1.6rem;font-weight:700}
+.frac.result{color:var(--plum)}
+.sum .bars{gap:12px}
+.sum .bar{height:60px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <a class="volver" href="./">← Taller</a>
-    <h1>Fraccions iguals</h1>
+    <h1>Fraccions</h1>
   </div>
 
   <section id="levelsView" class="wrap" style="gap:14px">
-    <p class="muted">Dues barres de xocolata iguals, partides de maneres diferents. Pots menjar el mateix trossejant-la diferent?</p>
+    <p class="muted">Barres de xocolata partides de maneres diferents. Primer, fraccions iguals; després, sumar i restar.</p>
     <div class="levels" id="levels"></div>
   </section>
 
@@ -60,7 +68,22 @@
     { name:"Meitats", desc:"La meitat d'una barra, partida en més trossos.", mode:"match", ch:[[1,2,4],[1,2,6],[1,2,8],[1,2,10]] },
     { name:"Terços i quarts", desc:"Pinta el mateix tros que la barra de dalt.", mode:"match", ch:[[1,3,6],[2,3,6],[1,4,8],[3,4,8],[2,3,9]] },
     { name:"Tria els trossos", desc:"Tu decideixes en quants trossos parteixes la barra.", mode:"choose", ch:[[1,2],[2,3],[3,4],[2,5]] },
-    { name:"Quina és més gran?", desc:"Compara dues fraccions.", mode:"compare", ch:[[[2,3],[3,4]],[[3,6],[1,2]],[[2,5],[1,3]],[[5,8],[3,4]],[[4,6],[2,3]]] }
+    { name:"Quina és més gran?", desc:"Compara dues fraccions.", mode:"compare", ch:[[[2,3],[3,4]],[[3,6],[1,2]],[[2,5],[1,3]],[[5,8],[3,4]],[[4,6],[2,3]]] },
+    // Sumar i restar: [operació, a, n, b, m, trossos de la barra nova (0 = els tria ell), pregunta opcional]
+    { name:"Sumem i restem", desc:"Trossos iguals: suma o resta la xocolata.", mode:"sum",
+      ch:[["+",1,4,2,4,4],["+",2,5,1,5,5],["−",5,6,2,6,6],["+",3,8,4,8,8],["−",7,8,3,8,8]] },
+    { name:"Un tros dins de l'altre", desc:"Mitjos i quarts, terços i sisens…", mode:"sum",
+      ch:[["+",1,2,1,4,4],["+",1,4,1,8,8],["−",1,2,1,4,4],["+",1,3,1,6,6],["−",3,4,1,2,4]] },
+    { name:"Una barra nova", desc:"Com el repte 1/2 + 1/3: cal una barra on hi càpiguen tots dos.", mode:"sum",
+      ch:[["+",1,2,1,3,6],["+",1,2,1,5,10],["−",1,2,1,3,6],["+",1,3,1,4,12],["−",3,4,2,3,12]] },
+    { name:"Tu tries la barra", desc:"Ningú no et diu en quants trossos partir-la.", mode:"sum",
+      ch:[["+",1,2,1,3,0],["+",2,3,1,4,0],["−",4,5,1,2,0],["+",1,4,1,6,0],["+",1,2,1,9,0]] },
+    { name:"Problemes", desc:"Pizzes, gots i cintes.", mode:"sum",
+      ch:[["+",3,8,2,8,8,"Una pizza té 8 trossos. En Biel se'n menja 3/8 i la mare 2/8. Quina part de la pizza s'han menjat?"],
+          ["+",1,2,1,3,0,"Omples 1/2 de got amb suc i hi afegeixes 1/3 de got d'aigua. Quina part del got està plena?"],
+          ["+",1,3,1,4,0,"D'una cinta en talles 1/3 per a un regal i 1/4 per a un altre. Quina part de la cinta has fet servir?"],
+          ["−",1,1,7,12,12,"Si de la cinta n'has fet servir 7/12, quina part en queda?"],
+          ["−",3,4,1,3,0,"Tens 3/4 d'un pastís i en regales 1/3 del pastís. Quant pastís et queda?"]] }
   ];
 
   var li, ci;
@@ -90,12 +113,96 @@
     return row;
   }
 
+  function fs(x, y){ return y === 1 ? String(x) : x + "/" + y; }
+  var NOM = {2:"mitjos",3:"terços",4:"quarts",5:"cinquens",6:"sisens",7:"setens",8:"vuitens",9:"novens",10:"desens",12:"dotzens"};
+
+  function plainBar(n, d, kind, label){
+    var row = el("div", "barRow");
+    var lab = el("div", "lab"); if (label) lab.appendChild(el("span", "", label)); lab.appendChild(d === 1 ? el("span", "frac " + kind, String(n)) : frac(n, d, kind)); row.appendChild(lab);
+    var bar = el("div", "bar fixed " + kind + (d === 1 ? " whole" : ""));
+    for (var i = 0; i < d; i++){ var p = el("button", "part"); p.type = "button"; p.tabIndex = -1; if (i < n) p.classList.add("on"); bar.appendChild(p); }
+    row.appendChild(bar); return row;
+  }
+
+  function startSum(L, c, st, ask, bars, extra, msg, btns, win){
+    st.classList.add("sum");
+    var op = c[0], a = c[1], n = c[2], b = c[3], m = c[4], fixedD = c[5], q = c[6];
+    var d = fixedD || 2, mine = {}, solved = false, hintStep = 0;
+    var plus = op === "+";
+    ask.textContent = q || (plus ? "Quanta xocolata hi ha si ajuntes la blava i la taronja? Pinta-la a la barra de sota."
+                                 : "Si a la xocolata blava li treus la taronja, quanta en queda? Pinta-la a la barra de sota.");
+    function fits(){ return d % n === 0 && d % m === 0; }
+    function count(){ return Object.keys(mine).length; }
+    function target(){ return plus ? a * d / n + b * d / m : a * d / n - b * d / m; }
+    function draw(reveal){
+      bars.innerHTML = "";
+      bars.appendChild(plainBar(a, n, "upper"));
+      bars.appendChild(plainBar(b, m, "lower", op));
+      var row = el("div", "barRow");
+      var lab = el("div", "lab"); lab.appendChild(el("span", "", "=")); lab.appendChild(frac(count(), d, "result")); row.appendChild(lab);
+      var bar = el("div", "bar result");
+      var A = a * d / n, B = b * d / m;
+      for (var i = 0; i < d; i++){
+        var p = el("button", "part"); p.type = "button";
+        if (reveal){ if (plus){ if (i < A) p.classList.add("ua"); else if (i < A + B) p.classList.add("lb"); } else if (i < A - B) p.classList.add("ua"); }
+        else if (mine[i]) p.classList.add("on");
+        p.setAttribute("aria-label", "Tros " + (i + 1) + " de " + d + (mine[i] ? ", pintat" : ""));
+        (function(i){ p.addEventListener("click", function(){ if (solved) return; if (mine[i]) delete mine[i]; else mine[i] = 1; Taller.msg(msg, ""); draw(); }); })(i);
+        bar.appendChild(p);
+      }
+      row.appendChild(bar); bars.appendChild(row);
+    }
+    if (!fixedD){
+      extra.appendChild(el("span", "", "Trossos de la barra nova:")).style.fontWeight = "700";
+      var holder = el("div"); extra.appendChild(holder);
+      var first = true;
+      Taller.stepper(holder, { min:2, max:24, value:2, onChange:function(v){ d = v; mine = {}; hintStep = 0; if (!first) Taller.msg(msg, ""); first = false; draw(); } });
+    }
+    draw();
+    var chk = el("button", "btn primary", "Comprova"); chk.type = "button";
+    var hint = el("button", "btn soft", "Una pista"); hint.type = "button";
+    chk.addEventListener("click", function(){
+      if (solved) return;
+      if (!fits()){
+        Taller.tried();
+        var bad = d % n !== 0 ? n : m;
+        Taller.msg(msg, "Amb " + d + " trossos, els " + (NOM[bad] || "trossos de 1/" + bad) + " no hi caben exactes: mira les ratlles de les barres de dalt. Prova un altre nombre!", "think");
+        return;
+      }
+      var k = count(), t = target();
+      if (k === t){
+        solved = true; draw(true); chk.hidden = true; hint.hidden = true;
+        var A = a * d / n, B = b * d / m;
+        var steps = (n === d && m === d) ? "" : " = " + fs(A, d) + " " + op + " " + fs(B, d);
+        var res = fs(t, d) + (t === d ? " (una sencera!)" : "");
+        win(fs(a, n) + " " + op + " " + fs(b, m) + steps + " = " + res + ".");
+        return;
+      }
+      Taller.tried();
+      if (plus && k === a * d / n) Taller.msg(msg, "Ja tens la part blava. Ara afegeix-hi la taronja!", "think");
+      else Taller.msg(msg, k < t ? "Encara falta una mica de xocolata. Mira fins on arriba cada color a dalt." : "Has pintat massa trossos. Mira fins on arriba cada color a dalt.", "think");
+    });
+    hint.addEventListener("click", function(){
+      if (solved) return;
+      Taller.hinted();
+      if (!fits()){
+        var ok = []; for (var x = 2; x <= 24; x++) if (x % n === 0 && x % m === 0) ok.push(x);
+        Taller.msg(msg, hintStep++ === 0 ? "Busca un nombre de trossos que es pugui partir en " + (NOM[n] || n) + " i també en " + (NOM[m] || m) + "." : "Prova amb " + ok[0] + " trossos.", "think");
+        return;
+      }
+      var A = a * d / n, B = b * d / m;
+      Taller.msg(msg, hintStep++ % 2 === 0 ? "El blau (" + fs(a, n) + ") ocupa " + A + (A === 1 ? " tros" : " trossos") + " de la barra nova."
+                                           : "El taronja (" + fs(b, m) + ") ocupa " + B + (B === 1 ? " tros" : " trossos") + " de la barra nova.", "think");
+    });
+    btns.appendChild(chk); btns.appendChild(hint);
+  }
+
   function start(){
     $("levelsView").hidden = true; $("playView").hidden = false;
     var L = LEVELS[li], c = L.ch[ci], st = $("stage"), solved = false;
     Taller.begin(GAME, "L" + li + "-" + ci);
     $("levelName").textContent = "Nivell " + (li + 1) + " · " + L.name; dots();
-    st.innerHTML = "";
+    st.innerHTML = ""; st.classList.remove("sum");
     var ask = el("p", "ask"); st.appendChild(ask);
     var bars = el("div", "bars"); st.appendChild(bars);
     var extra = el("div", "row"); st.appendChild(extra);
@@ -114,7 +221,9 @@
     }
 
     var chk = null;
-    if (L.mode === "match" || L.mode === "choose"){
+    if (L.mode === "sum"){
+      startSum(L, c, st, ask, bars, extra, msg, btns, win);
+    } else if (L.mode === "match" || L.mode === "choose"){
       var n1 = c[0], d1 = c[1], d2 = L.mode === "match" ? c[2] : 2, mine = {};
       ask.textContent = L.mode === "match"
         ? "Pinta a la barra de baix la mateixa quantitat de xocolata que a la de dalt."

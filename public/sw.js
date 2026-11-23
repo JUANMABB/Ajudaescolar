@@ -9,7 +9,7 @@
    Nunca se guarda ni se entrega una respuesta que venga de una redirección: Safari la rechaza
    al abrir una página y la web dejaría de funcionar sin conexión. */
 
-const VERSION = "0.4.1";
+const VERSION = "0.5.0";
 const CACHE = "ajudaescolar-" + VERSION;
 const FILES = [
   "./",
